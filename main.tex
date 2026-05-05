@@ -1,0 +1,138 @@
+\documentclass[12pt,a4paper,twoside]{book}
+
+% ── ENCODING E LINGUA ─────────────────────────
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[italian]{babel}
+
+% ── GRAFICA ───────────────────────────────────
+\usepackage{graphicx}
+\graphicspath{{img/}}
+
+% ── INTERLINEA E GEOMETRIA ────────────────────
+\renewcommand{\baselinestretch}{1.5}
+\usepackage{geometry}
+\geometry{
+    a4paper,
+    left=30mm,
+    right=20mm,
+    top=25mm,
+    bottom=25mm
+}
+
+% ── BIBLIOGRAFIA ──────────────────────────────
+\usepackage[backend=biber,style=numeric,sorting=none]{biblatex}
+\addbibresource{bibliography.bib}
+
+% ── LINK E PDF ────────────────────────────────
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    citecolor=black,
+    urlcolor=blue
+}
+
+% ── CODICE SORGENTE ───────────────────────────
+\usepackage{listings}
+\usepackage{xcolor}
+\lstset{
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    frame=single,
+    backgroundcolor=\color{gray!10},
+    keywordstyle=\color{blue},
+    commentstyle=\color{green!60!black},
+    stringstyle=\color{orange}
+}
+
+% ── INTESTAZIONI ──────────────────────────────
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[LE]{\leftmark}
+\fancyhead[RO]{\rightmark}
+\fancyfoot[C]{\thepage}
+
+% ── ALTRI PACCHETTI UTILI ─────────────────────
+\usepackage{booktabs}   % tabelle professionali
+\usepackage{microtype}  % tipografia migliorata
+\usepackage{amsmath}    % formule matematiche
+
+% ─────────────────────────────────────────────
+\begin{document}
+
+% ── FRONTESPIZIO ──────────────────────────────
+\begin{titlepage}
+\begin{center}
+
+\includegraphics[width=6.5cm,height=4.7cm]{marchio-di-ateneo.png}
+\vspace{10mm}
+
+{\large{\bf{Dipartimento di Informatica -- Scienza e Ingegneria}}}
+\vspace{5mm}
+
+{\Large{\bf{Corso di Laurea Magistrale in Informatica per il Management}}}
+\vspace{15mm}
+
+{\Huge{\bf Orchestrazione adattiva di agenti}}\\
+\vspace{3mm}
+{\Huge{\bf LLM in contesto enterprise:}}\\
+\vspace{3mm}
+{\Huge{\bf architettura, implementazione}}\\
+\vspace{3mm}
+{\Huge{\bf e valutazione}}\\
+
+\end{center}
+
+\vspace{10mm}
+
+\begin{minipage}[t]{0.40\textwidth}
+{\Large{\bf Relatore: \\ Chiar.mo Prof.\\ Nome Cognome}}
+\vspace{5mm}
+
+% se hai un correlatore decommentare:
+% {\Large{\bf Correlatore: \\ Chiar.mo Prof.\\ Nome Cognome}}
+\end{minipage}
+\hfill
+\begin{minipage}[t]{0.40\textwidth}\raggedleft
+{\Large{\bf Presentata da: \\ Davide Piccinelli}}
+\end{minipage}
+
+\vspace{30mm}
+\rule[0.5cm]{15.8cm}{0.6mm}
+
+\begin{center}
+{\large{\bf Sessione Estiva 2025--2026 \\}}
+{\large{\bf Anno Accademico 2025/2026 \\}}
+\end{center}
+
+\end{titlepage}
+
+% ── PAGINE PRELIMINARI ────────────────────────
+\frontmatter
+
+\input{chapters/00_abstract}
+
+\tableofcontents
+\listoffigures
+% \listoftables  % decommentare se hai tabelle
+
+% ── CORPO DELLA TESI ──────────────────────────
+\mainmatter
+
+\input{chapters/01_introduzione}
+\input{chapters/02_background}
+\input{chapters/03_architettura}
+\input{chapters/04_implementazione}
+\input{chapters/05_valutazione}
+\input{chapters/06_conclusioni}
+
+% ── BIBLIOGRAFIA ──────────────────────────────
+\printbibliography[heading=bibintoc, title={Bibliografia}]
+
+% ── APPENDICI ─────────────────────────────────
+% \appendix
+% \input{chapters/appendice_a}
+
+\end{document}

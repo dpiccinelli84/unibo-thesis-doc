@@ -1,0 +1,124 @@
+\documentclass[12pt,a4paper]{report}
+% NON MODIFICARE il formato del documento: è quello standard per il frontespizio.
+\usepackage[italian]{babel}
+\usepackage{newlfont}
+\usepackage{graphicx}
+\usepackage[top=2cm]{geometry}
+\textwidth=450pt\oddsidemargin=0pt
+
+\begin{document}
+\begin{titlepage}
+\begin{center}
+
+% ------------------------------------------------------------------
+% LOGO DELL'UNIVERSITÀ
+% ------------------------------------------------------------------
+% Prima di compilare:
+% 1. Scarica il logo ufficiale dell'Università di Bologna dal sito di Ateneo.
+% 2. Salva l'immagine nella stessa cartella del file .tex con il nome:
+%       logo_unibo.png
+%    (oppure modifica il nome qui sotto per farlo coincidere con il file che hai scaricato).
+% 3. Assicurati che l'immagine sia in formato .png, .jpg o .pdf.
+\includegraphics[width=0.25\linewidth]{logo_unibo.png}\vspace{0.7cm}\\
+
+% Nome ufficiale dell'Ateneo: NON modificare.
+{{\Large{\textsc{Alma Mater Studiorum $\cdot$ Universit\`a di
+Bologna}}}} \rule[0.1cm]{15.8cm}{0.1mm}
+\rule[0.5cm]{15.8cm}{0.6mm}
+
+% ------------------------------------------------------------------
+% DIPARTIMENTO / CORSO DI LAUREA
+% ------------------------------------------------------------------
+% Selezionare il corso di Laurea di riferimento, cancellando le opzioni non necessarie.
+%
+{\small{\bf Dipartimento di Informatica --- Scienza e Ingegneria\\
+Corso di Laurea Magistrale/Triennale in Informatica/Informatica per il Management}}
+\end{center}
+
+\vspace{15mm}
+\begin{center}
+% ------------------------------------------------------------------
+% TITOLO DELLA TESI
+% ------------------------------------------------------------------
+% Sostituire "TITOLO DELLA TESI" con il titolo completo della propria tesi.
+% Suggerimenti:
+% - Usare MAIUSCOLO per il titolo principale, se richiesto dalle linee guida.
+% - Evitare abbreviazioni non standard.
+{\LARGE{\bf TITOLO DELLA TESI}}\\
+\vspace{3mm}
+
+\vspace{19mm}
+% ------------------------------------------------------------------
+% SETTORE SCIENTIFICO DI RIFERIMENTO (OPZIONALE)
+% ------------------------------------------------------------------
+% Questa riga è opzionale. Puoi:
+% - Sostituire "Settore Scientifico di Riferimento" con il nome dell'insegnamento
+%   o ambito disciplinare da cui nasce la tesi (es. "Machine Learning", "Calcolo Numerico").
+% - Oppure, se non richiesto dal tuo Corso di Laurea, puoi COMMENTARE
+%   l'intera riga anteponendo un % all'inizio.
+{\large{\bf Tesi di Laurea in ''Settore Scientifico di Riferimento'' \textit{(Opzionale)}}}
+\end{center}
+
+\vspace{30mm}
+\par
+\noindent
+\begin{minipage}[t]{0.50\textwidth}
+% ------------------------------------------------------------------
+% RELATORE
+% ------------------------------------------------------------------
+% Sostituire:
+% - "Chiar.ma Prof." con il titolo corretto del relatore:
+%    * "Chiar.mo Prof." / "Chiar.ma Prof.ssa"
+%    * oppure "Prof." / "Prof.ssa" / "Dott." / "Dott.ssa"
+%   a seconda di quanto concordato con il/la relatore/relatrice.
+% - "NOME RELATORE" con Nome e Cognome del relatore.
+{\large{\bf Relatore:\\
+Chiar.ma Prof.\\
+NOME RELATORE}} \\[5mm]
+
+% ------------------------------------------------------------------
+% CORRELATORE (FACOLTATIVO)
+% ------------------------------------------------------------------
+% Se HAI un correlatore:
+%   - Sostituisci "Chiar.mo Prof." con il titolo accademico corretto.
+%   - Sostituisci "NOME CORRELATORE" con Nome e Cognome del correlatore.
+%
+% Se NON hai un correlatore:
+%   - Commenta il blocco qui sotto anteponendo % a ciascuna riga,
+%     oppure cancellalo.
+\large{\bf Correlatore: \\
+Chiar.mo Prof. \\
+NOME CORRELATORE}
+\end{minipage}
+\hfill
+\begin{minipage}[t]{0.47\textwidth}\raggedleft
+% ------------------------------------------------------------------
+% NOME DELLAUREANDO / LAUREANDA
+% ------------------------------------------------------------------
+% Sostituire "NOME LAUREANDO" con:
+%   Nome Cognome
+% esattamente come compare nei documenti ufficiali.
+{\large{\bf Presentata da:\\
+NOME LAUREANDO}}
+\end{minipage}
+
+\vspace{10mm}
+\begin{center}
+% ------------------------------------------------------------------
+% APPELLO, DATA E ANNO ACCADEMICO
+% ------------------------------------------------------------------
+% "NUMERO Appello":
+%   - Sostituire con il numero dell'appello di laurea (es. "I Appello", "II Appello")
+%     secondo le indicazioni della Segreteria/CdS.
+%
+% "Sessione MESE ANNO":
+%   - Sostituire con la data ufficiale della seduta di laurea
+%
+% "Anno Accademico 20xx/20xx":
+%   - Sostituire con l'Anno Accademico corretto (es. "Anno Accademico 2025/2026").
+{\large{\bf Sessione MESE ANNO \\}}
+{\large{\bf Anno Accademico 20xx/20xx\\}}
+\end{center}
+\end{titlepage}
+
+\end{document}

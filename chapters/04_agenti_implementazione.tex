@@ -1,0 +1,175 @@
+% =====================================================================
+% CAPITOLO 4 — IMPLEMENTAZIONE DELLA SUITE DI AGENTI
+% =====================================================================
+% POLPA, parte A2 di B (agenti).
+% Scopo: dettagli tecnici sufficienti a convincere della SOLIDITA'
+% delle realizzazioni, senza diventare documentazione operativa.
+% Le scelte non peculiari (FastAPI, React, Terraform) si enunciano
+% ma non si motivano in dettaglio.
+%
+% Ordine di scrittura: PRIMO (insieme al Cap. 3).
+% =====================================================================
+
+\chapter{La suite di agenti: implementazione}
+\label{chap:agenti-implementazione}
+
+% =====================================================================
+\section{Stack tecnologico, monorepo, infrastruttura, sicurezza}
+\label{sec:agenti-stack}
+% =====================================================================
+
+\subsection{Stack tecnologico}
+\label{subsec:agenti-stack-tech}
+% TODO — In una pagina, enunciare lo stack:
+% Backend: Python 3.10+, FastAPI, SQLAlchemy asincrono, asyncpg, httpx.
+% Frontend: React 19, TypeScript, Vite, Tailwind.
+% Database: Cloud SQL PostgreSQL 16, BigQuery.
+% LLM: Gemini 2.5 Flash/Pro (Vertex AI), Claude Sonnet 4.6 (Anthropic SDK).
+% Sicurezza: Model Armor, Cloud DLP, MSAL.
+% Infrastruttura: Cloud Run, Terraform, Cloud Build, Artifact Registry.
+% Citazioni: \cite{gcp_cloudrun}, \cite{gcp_vertexai}, \cite{terraform_docs},
+% \cite{anthropic_docs}.
+
+\subsection{Struttura della codebase}
+\label{subsec:agenti-monorepo}
+% TODO — Monorepo `c30-ai-agents` organizzato per servizio. Convenzione
+% `app/{api,services,models,core}` adottata sui backend maturi
+% (vera-backend). Refactor dei backend originariamente monolitici
+% (nps-backend, sysaid-backend).
+
+% [FIGURA/LISTATO 4.1] Estratto dell'albero del monorepo.
+%
+% \begin{figure}[h]
+%     \centering
+%     \begin{lstlisting}
+% c30-ai-agents/
+%   vera-backend/
+%   vera-frontend/
+%   docs-backend/         (CooPolicy)
+%   nps-backend/          (AllyCare)
+%   sysaid-backend/       (SysAid Gemini)
+%   sysaid-sonnet-backend/
+%   admin-portal-frontend/
+%   admin-frontend/
+%   iac-infrastructure/   (Terraform)
+%   ai-dev-documents/
+%     \end{lstlisting}
+%     \caption[Struttura del monorepo]{Estratto rilevante della struttura del monorepo \texttt{c30-ai-agents}.}
+%     \label{fig:monorepo_tree}
+% \end{figure}
+
+\subsection{Infrastruttura Terraform e pipeline CI/CD}
+\label{subsec:agenti-iac}
+% TODO — Terraform multi-ambiente (test/prod), modulo `cloud_run_services`
+% parametrizzato. Pipeline Cloud Build -> Artifact Registry -> Cloud Run.
+% VPC egress `PRIVATE_RANGES_ONLY`. PSC per Cloud SQL. Template
+% Model Armor e DLP deployati via IaC.
+
+% [FIGURA 4.2] Pipeline CI/CD: push su Cloud Source Repo -> Cloud Build
+% -> immagine in Artifact Registry -> deploy su Cloud Run.
+%
+% \begin{figure}[h]
+%     \centering
+%     \includegraphics[width=0.9\textwidth]{fig04_cicd_pipeline.pdf}
+%     \caption[Pipeline CI/CD]{Pipeline di build e deploy per ciascun servizio della suite: push su branch \texttt{test} o \texttt{main}, build container, push su Artifact Registry, deploy su Cloud Run con configurazione gestita da Terraform.}
+%     \label{fig:cicd_pipeline}
+% \end{figure}
+
+\subsection{Autenticazione, audit, sicurezza}
+\label{subsec:agenti-auth}
+% TODO — Flusso MSAL -> JWT locale, middleware quota, sanitizzazione DLP
+% pre-generazione, filtri Model Armor, audit logging a livello di
+% messaggio con tracciamento dei token. Citazioni: \cite{msft_msal},
+% \cite{gcp_modelarmor}, \cite{gcp_dlp}, \cite{perez2022promptinjection}.
+
+% [FIGURA 4.3] Punti di intercettazione DLP + Model Armor nel flusso
+% di una request.
+%
+% \begin{figure}[h]
+%     \centering
+%     \includegraphics[width=0.85\textwidth]{fig04_security_chain.pdf}
+%     \caption[Catena di sicurezza pre-generazione]{Punti di intercettazione: sanitizzazione PII via Cloud DLP e filtri Responsible AI via Model Armor, applicati prima e dopo la generazione.}
+%     \label{fig:security_chain}
+% \end{figure}
+
+% =====================================================================
+\section{Vera — backend e frontend}
+\label{sec:agenti-vera-impl}
+% =====================================================================
+% TODO — POLPA agente 1 (implementazione).
+% - Integrazione Google Search grounding via Vertex AI.
+% - Model router euristico: regole sulla forma della query (lunghezza,
+%   presenza di keyword) per scegliere Flash o Pro.
+% - Streaming SSE: come e' implementato lato backend (asyncgen +
+%   StreamingResponse) e lato frontend (EventSource).
+% - Quota accounting post-generazione: trigger su tabella conversation_messages.
+% - Frontend: componenti chiave, gestione delle citazioni inline (mappare
+%   i grounding_chunks restituiti da Vertex AI).
+%
+% Includere uno snippet di codice (router euristico o chiamata
+% Vertex AI con grounding abilitato).
+
+% [LISTATO 4.4] Snippet di codice: chiamata a Vertex AI con Google
+% Search grounding abilitato.
+
+% =====================================================================
+\section{CooPolicy — backend (\texttt{docs-backend})}
+\label{sec:agenti-coopolicy-impl}
+% =====================================================================
+% TODO — POLPA agente 2 (implementazione).
+% - Query expansion con Gemini Flash: prompt, formato di output.
+% - Retrieval RAG Engine con threshold (0.25 di default) e top-k 10.
+% - Generazione con Pro a temperatura bassa per ridurre creativita'.
+% - Costruzione delle citazioni inline (markdown reference).
+% - Tabella ACL: mapping gruppo Entra ID -> visibilita' agente.
+%
+% [LISTATO 4.5] Snippet della query expansion + retrieval.
+
+% =====================================================================
+\section{AllyCare / NPS — backend}
+\label{sec:agenti-allycare-impl}
+% =====================================================================
+% TODO — POLPA agente 3 (implementazione).
+% - Tool use con Gemini: declaration schema dei tre tool, gestione
+%   dell'agentic loop (max iterazioni, error handling).
+% - Gestione errori BigQuery: parsing degli errori SQL, retry con prompt
+%   correttivo.
+% - Generazione chart server-side (matplotlib o Vega-Lite renderizzato
+%   in PNG, embed in markdown response).
+% - Schema caching: come si seleziona quali tabelle iniettare nel prompt
+%   in funzione della query.
+%
+% [LISTATO 4.6] Tool declaration `run_sql` per Vertex AI.
+
+% =====================================================================
+\section{SysAid — backend Gemini e backend Sonnet}
+\label{sec:agenti-sysaid-impl}
+% =====================================================================
+% TODO — POLPA agente 4 (implementazione, due varianti).
+
+\subsection{SysAid Gemini}
+\label{subsec:agenti-sysaid-gemini}
+% TODO — Stessa architettura del backend NPS, schema BigQuery diverso
+% (tabelle ticket SysAid). Tool use Vertex AI nativo.
+
+\subsection{SysAid Sonnet}
+\label{subsec:agenti-sysaid-sonnet}
+% TODO — Differenze rispetto al backend Gemini:
+% - Anthropic SDK \cite{anthropic_docs}: client, autenticazione via
+%   API key in Secret Manager.
+% - Tool use: traduzione dello schema dei tool dal formato Vertex AI
+%   al formato Anthropic (snake_case differenze, input_schema vs parameters).
+% - Gestione del ciclo: stop_reason: "tool_use" -> esecuzione tool ->
+%   tool_result message -> nuova chiamata.
+% - Cost accounting: pricing diverso (input/output token).
+%
+% [LISTATO 4.7] Adapter di traduzione tool schema Vertex AI -> Anthropic.
+
+% =====================================================================
+\section{Admin}
+\label{sec:agenti-admin-impl}
+% =====================================================================
+% TODO — Cenni sul backend admin (router endpoints), JWT, integrazione
+% Entra ID lato amministratori. NON e' centrale per la tesi ma va
+% menzionato per completezza dell'infrastruttura.
+% Le pagine nuove introdotte da Orion sono trattate nel Cap. 6.

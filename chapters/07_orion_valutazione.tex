@@ -1,0 +1,201 @@
+% =====================================================================
+% CAPITOLO 7 — ORION: VALUTAZIONE SPERIMENTALE
+% =====================================================================
+% POLPA, parte B3 di B. E' il capitolo piu' originale e piu' "scientifico"
+% della tesi: il framework di valutazione iterativa del system prompt
+% del router e' uno dei tre contributi principali.
+%
+% Riferimento: plans/ORION_ROADMAP.md (sez. 6).
+% Ordine di scrittura: TERZO (dopo Cap. 3-4-5-6), parallelamente alla
+% raccolta dei risultati.
+% =====================================================================
+
+\chapter{Orion: valutazione sperimentale}
+\label{chap:orion-valutazione}
+
+% =====================================================================
+\section{Domande di ricerca e impianto sperimentale}
+\label{sec:eval-research-questions}
+% =====================================================================
+% TODO — Esplicitare le domande di ricerca a cui questo capitolo
+% risponde:
+%
+% RQ1 — Quanto e' accurato il routing dell'orchestratore (agent accuracy)
+%       sul dominio Coop?
+% RQ2 — Quanto e' accurata la stima di complessita' (complexity accuracy)?
+% RQ3 — Il confidence score e' calibrato? (E' piu' alto sui casi
+%       corretti che su quelli errati?)
+% RQ4 — Il meccanismo di clarification riduce l'errore senza degradare
+%       l'esperienza utente (clarification rate non eccessivo)?
+% RQ5 — Iterazioni del system prompt migliorano le metriche in modo
+%       misurabile?
+%
+% Citare \cite{liu2023agentbench} come framework di riferimento per la
+% valutazione di agenti LLM e \cite{zheng2023llmjudge} per la
+% metodologia LLM-as-judge (eventualmente usata per valutare il
+% reasoning del router come metrica complementare).
+
+% =====================================================================
+\section{Metodologia di valutazione}
+\label{sec:eval-metodologia}
+% =====================================================================
+
+\subsection{Costruzione del gold standard su Coda}
+\label{subsec:eval-gold-standard}
+% TODO — Test suite Coda: tabella "Test Suite Orion" con colonne
+% ID, Prompt, Agente Atteso, Complessita' Attesa, Categoria, Note,
+% Attivo. Numero minimo di test case: 50 (10 per agente + 10 ambigui).
+%
+% Costruzione: prompt sintetizzati a partire da log reali della suite
+% (anonimizzati) + prompt creati ad hoc per coprire i casi limite
+% (intent overlap tra SysAid e AllyCare; richieste fuori dominio;
+% domande ambigue tra Vera e CooPolicy).
+%
+% Categorie di prompt: SysAid, NPS, Policy, General, Ambiguous.
+
+% [FIGURA 7.1] Schema della tabella Coda con un estratto rappresentativo
+% dei test case (5-7 righe).
+%
+% \begin{figure}[h]
+%     \centering
+%     \includegraphics[width=\textwidth]{fig07_coda_test_suite.pdf}
+%     \caption[Schema della test suite su Coda]{Estratto della tabella \texttt{Test Suite Orion} su Coda: gold standard di prompt etichettati con agente atteso, complessita' attesa e categoria tematica.}
+%     \label{fig:coda_test_suite}
+% \end{figure}
+
+\subsection{Tabella dei risultati e metriche derivate}
+\label{subsec:eval-results-table}
+% TODO — Tabella "Risultati Valutazione Orion": una riga per esecuzione
+% di test case (Run ID + Test Case ID + Versione System Prompt come
+% chiave composta). Colonne: agente atteso vs prodotto, complessita'
+% attesa vs prodotta, confidence, reasoning, formula di accuracy.
+
+\subsection{Lo script di valutazione (\texttt{orion-eval/})}
+\label{subsec:eval-script}
+% TODO — Architettura dello script:
+% orion-eval/
+%   main.py           # entry point
+%   coda_client.py    # wrapper Coda API
+%   orion_client.py   # chiama POST /api/orion/classify
+%   report.py         # report testuale + CSV
+%   config.py         # env vars
+%
+% Flusso: legge i test case attivi, chiama /classify, confronta con
+% atteso, scrive su Coda, stampa summary.
+
+% =====================================================================
+\section{Metriche e target}
+\label{sec:eval-metriche}
+% =====================================================================
+% TODO — Tabella delle metriche con target dichiarati a priori:
+%
+% Agent Accuracy:        correct_agent / total          target >= 85%
+% Complexity Accuracy:   correct_complexity / total     target >= 80%
+% Clarification Rate:    clarification_asked / total    target < 15%
+% Mean Confidence (cor.): media confidence sui corretti target >= 0.82
+% Mean Confidence (err.): media confidence sugli errati  target <= 0.65
+%
+% L'ultima coppia di metriche valida la CALIBRAZIONE del confidence
+% score: un buon router deve essere piu' incerto quando sbaglia
+% \cite{kadavath2022knowsknows}.
+
+% =====================================================================
+\section{Risultati}
+\label{sec:eval-risultati}
+% =====================================================================
+% TODO — Da popolare con i numeri reali al termine degli esperimenti.
+% Strutturare i risultati in 4 sotto-sezioni, una per gruppo di metriche.
+%
+% IMPORTANTE — Per ogni risultato presentato:
+% 1. Domanda di ricerca a cui risponde (RQ1..5).
+% 2. Numeri concreti (con unita' di misura).
+% 3. Confronto con il target.
+% 4. Discussione dei casi anomali (se presenti).
+
+\subsection{Routing accuracy per agente}
+\label{subsec:eval-routing-accuracy}
+% TODO — Tabella + bar chart: accuracy per ciascun agente target
+% (self, sysaid_gemini, sysaid_sonnet, allycare, coopolicy).
+% Identificare gli agenti su cui l'accuracy e' piu' bassa e ipotizzare
+% le ragioni.
+
+% [FIGURA 7.2] Bar chart accuracy per agente. DATO REALE da popolare.
+%
+% \begin{figure}[h]
+%     \centering
+%     \includegraphics[width=0.85\textwidth]{fig07_accuracy_per_agent.pdf}
+%     \caption[Accuracy di routing per agente target]{Accuracy di routing dell'orchestratore Orion, suddivisa per agente target. La linea tratteggiata indica il target di progetto (85\%).}
+%     \label{fig:accuracy_per_agent}
+% \end{figure}
+
+\subsection{Calibrazione del confidence score}
+\label{subsec:eval-confidence-cal}
+% TODO — Confronto tra distribuzione di confidence sui casi corretti
+% e quella sui casi errati. Analisi: il modello e' calibrato? La soglia
+% 0.60 e' la migliore?
+% Strumenti possibili: reliability diagram, expected calibration error.
+
+% [FIGURA 7.3] Istogramma confidence: corretti vs errati.
+% DATO REALE da popolare.
+%
+% \begin{figure}[h]
+%     \centering
+%     \includegraphics[width=0.85\textwidth]{fig07_confidence_calibration.pdf}
+%     \caption[Calibrazione del confidence score]{Distribuzione del confidence score sui casi correttamente classificati e su quelli erroneamente classificati. Una buona calibrazione richiede che le due distribuzioni siano separate.}
+%     \label{fig:confidence_calibration}
+% \end{figure}
+
+\subsection{Iterazione del system prompt}
+\label{subsec:eval-iterazione}
+% TODO — Documentare le iterazioni: v1.0 -> v1.1 -> v1.2 -> ...
+% Per ogni iterazione: cosa e' stato cambiato nel system prompt, cosa
+% e' migliorato, cosa e' peggiorato. Trade-off osservati.
+% Citare \cite{sahoo2024prompteng_survey} come quadro teorico del
+% prompt engineering iterativo.
+
+% [FIGURA 7.4] Timeline accuracy per versione di system prompt.
+% DATO REALE.
+%
+% \begin{figure}[h]
+%     \centering
+%     \includegraphics[width=0.9\textwidth]{fig07_prompt_iteration.pdf}
+%     \caption[Iterazione del system prompt]{Andamento delle metriche di accuracy lungo le versioni successive del system prompt del router.}
+%     \label{fig:prompt_iteration}
+% \end{figure}
+
+\subsection{Latenza del routing step}
+\label{subsec:eval-latenza}
+% TODO — Misurazione della latenza p50/p95/p99 della call al router.
+% Importante per valutare l'impatto sull'esperienza utente: il routing
+% step aggiunge latenza all'intera pipeline.
+% Misurare anche la latenza del proxy (overhead Cloud Run-to-Cloud Run).
+
+% [FIGURA 7.5] Distribuzione latenza routing step (boxplot p50/p95/p99).
+%
+% \begin{figure}[h]
+%     \centering
+%     \includegraphics[width=0.8\textwidth]{fig07_latenza.pdf}
+%     \caption[Latenza del routing step]{Distribuzione della latenza del routing step (boxplot p50/p95/p99) misurata su un campione rappresentativo di richieste.}
+%     \label{fig:routing_latency}
+% \end{figure}
+
+% =====================================================================
+\section{Analisi dei casi di errore}
+\label{sec:eval-errori}
+% =====================================================================
+% TODO — Analisi qualitativa dei casi in cui Orion sbaglia. Pattern
+% ricorrenti identificati nei reasoning del router. Esempi di
+% "false positive" e "false negative" rispetto a ciascun agente.
+% Lezioni apprese che hanno portato alle iterazioni del system prompt.
+
+% =====================================================================
+\section{Discussione: limiti dell'impianto di valutazione}
+\label{sec:eval-limiti}
+% =====================================================================
+% TODO — Discutere onestamente i limiti:
+% - Dimensione del gold standard (50 test case e' un minimo).
+% - Bias del costruttore del dataset (l'autore ha costruito i prompt).
+% - Dataset sintetico vs traffico reale: gap potenziale.
+% - LLM-as-judge per il reasoning: noto che ha bias \cite{zheng2023llmjudge}.
+% - Confronto con \cite{liang2022helm} (HELM): la valutazione qui e'
+%   piu' specifica del contesto, meno "olistica".

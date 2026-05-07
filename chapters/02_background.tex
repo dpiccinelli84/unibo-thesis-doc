@@ -1,0 +1,189 @@
+% =====================================================================
+% CAPITOLO 2 — BACKGROUND
+% =====================================================================
+% Scopo (linee guida del prof): mettere un lettore non specialista
+% (informatica magistrale) in condizione di apprezzare i contributi.
+% Spiegare SOLO i concetti che riappaiono nei capitoli polpa.
+% NON una rassegna esaustiva: una raccolta categorizzata costruita
+% mentre si scrive la polpa.
+%
+% Ordine di scrittura: SECONDO (subito dopo la polpa).
+% Lunghezza indicativa: ~25-30 pagine.
+% =====================================================================
+
+\chapter{Background}
+\label{chap:background}
+
+% TODO — Aprire il capitolo con un breve "manifesto" dello stile:
+% spiegazione concisa, ogni sezione ancorata a 1-2 riferimenti
+% bibliografici per l'approfondimento, niente di superfluo.
+
+% =====================================================================
+\section{Dai modelli di linguaggio ai Transformer}
+\label{sec:bg-transformer}
+% =====================================================================
+% TODO — Richiamo storico SCURNO: n-gram -> RNN/LSTM -> attenzione ->
+% Transformer \cite{vaswani2017attention}. Perche' il Transformer
+% ha vinto: parallelizzazione, dipendenze a lungo raggio, scalabilita'.
+% Distinzione encoder/decoder/encoder-decoder; dominanza decoder-only
+% (GPT, LLaMA, Gemini, Claude).
+
+% =====================================================================
+\section{Large Language Model: capacita', limiti, allineamento}
+\label{sec:bg-llm}
+% =====================================================================
+% TODO — Pre-training autoregressivo, capacita' emergenti, leggi di scala
+% \cite{brown2020gpt3}. Instruction tuning + RLHF \cite{ouyang2022instructgpt}
+% come allineamento al comportamento desiderato.
+% Allucinazioni come limite strutturale \cite{xu2024hallucination}.
+% Knowledge cutoff e conseguenze pratiche in azienda.
+
+% =====================================================================
+\section{Prompt engineering, function calling, tool use}
+\label{sec:bg-prompting}
+% =====================================================================
+% TODO — Zero-shot, few-shot, Chain-of-Thought \cite{wei2022cot}.
+% Function calling: schema, agentic loop, tool nidificati.
+% E' il meccanismo su cui si fondano gli agenti Text-to-SQL e il router
+% di Orion (output strutturato).
+
+% =====================================================================
+\section{Grounding: ancorare la generazione a fonti esterne}
+\label{sec:bg-grounding}
+% =====================================================================
+% TODO — Il grounding come contromisura alle allucinazioni
+% \cite{guu2020realm}. Differenza concettuale tra grounding (intervento
+% a inferenza) e fine-tuning (modifica dei pesi).
+
+% [FIGURA 2.1] Tre meccanismi di grounding affiancati: Web grounding,
+% RAG, Text-to-SQL — uno schema che mostri input, fonte ancorata, output.
+% Tipo: schema concettuale.
+%
+% \begin{figure}[h]
+%     \centering
+%     \includegraphics[width=0.95\textwidth]{fig02_grounding_three_ways.pdf}
+%     \caption[Tre forme di grounding affiancate]{Tre meccanismi di grounding adottati nella suite: Web grounding (Vera), RAG (CooPolicy) e Text-to-SQL (AllyCare, SysAid).}
+%     \label{fig:grounding_three_ways}
+% \end{figure}
+
+\subsection{Web grounding}
+\label{subsec:bg-web-grounding}
+% TODO — Integrazione nativa Google Search in Vertex AI. Quando
+% e' appropriato (fatti pubblici, attualita') e quando NO (dati privati).
+
+\subsection{Retrieval-Augmented Generation}
+\label{subsec:bg-rag}
+% TODO — Pipeline canonica \cite{lewis2020rag}: chunking, embedding,
+% vector store, retrieval, generation. Hybrid search dense+sparse,
+% re-ranking, query expansion \cite{ma2023query_expansion},
+% HyDE \cite{gao2022hyde}. Vertex AI RAG Engine come realizzazione managed.
+% Distinzione cruciale (riusata in Cap. 3): RAG corpus per-utente
+% vs RAG corpus condiviso.
+
+% [FIGURA 2.2] Pipeline RAG canonica: documento -> chunk -> embedding ->
+% indice -> retrieval -> generation con contesto.
+%
+% \begin{figure}[h]
+%     \centering
+%     \includegraphics[width=0.9\textwidth]{fig02_rag_pipeline.pdf}
+%     \caption[Pipeline RAG canonica]{Pipeline canonica di Retrieval-Augmented Generation: dall'ingestione dei documenti alla generazione vincolata al contesto recuperato.}
+%     \label{fig:rag_pipeline}
+% \end{figure}
+
+\subsection{Text-to-SQL}
+\label{subsec:bg-text2sql}
+% TODO — Traduzione NL -> SQL. Challenge: schema awareness, dialetti,
+% JOIN multi-tabella, aggregazioni temporali. Benchmark: Spider
+% \cite{yu2018spider}, BIRD \cite{li2023bird}. Metriche: execution
+% accuracy, exact match. Approcci con LLM: schema injection, few-shot,
+% decomposizione \cite{pourreza2023dinsql}.
+
+% =====================================================================
+\section{Valutazione automatica di sistemi RAG: il framework RAGAS}
+\label{sec:bg-ragas}
+% =====================================================================
+% TODO — RAGAS \cite{es2023ragas} come insieme di metriche LLM-as-judge:
+% faithfulness, answer relevancy, context precision, context recall.
+% Limiti del paradigma LLM-as-judge \cite{zheng2023llmjudge}.
+
+% =====================================================================
+\section{Agenti LLM e architetture multi-agente}
+\label{sec:bg-multiagent}
+% =====================================================================
+% TODO — Paradigma ReAct \cite{yao2022react} (Thought -> Action -> Observation),
+% memoria short/long-term. Survey LLM multi-agente \cite{guo2024multiagent}:
+% architetture cooperative, competitive, hierarchical.
+% Orion = hierarchical con supervisor agent.
+% Pattern AutoGen \cite{wu2023autogen}: GroupChatManager.
+% Mixture-of-Agents \cite{wang2024moa} come riferimento terminologicamente
+% piu' corretto del classico MoE \cite{jiang2024mixtral} (interno al modello).
+
+% [FIGURA 2.3] Tassonomia architetture multi-agent (cooperative,
+% hierarchical, competitive) con esempi di pattern.
+%
+% \begin{figure}[h]
+%     \centering
+%     \includegraphics[width=0.85\textwidth]{fig02_multiagent_taxonomy.pdf}
+%     \caption[Tassonomia delle architetture multi-agent LLM]{Le tre macro-categorie di architetture multi-agent secondo \cite{guo2024multiagent}, con il posizionamento di Orion nel ramo \emph{hierarchical}.}
+%     \label{fig:multiagent_taxonomy}
+% \end{figure}
+
+% [FIGURA 2.4] Pattern ReAct: ciclo Thought -> Action -> Observation.
+%
+% \begin{figure}[h]
+%     \centering
+%     \includegraphics[width=0.7\textwidth]{fig02_react_loop.pdf}
+%     \caption[Ciclo ReAct]{Il ciclo Thought-Action-Observation del pattern ReAct \cite{yao2022react}, alla base degli agenti della suite e del router di Orion.}
+%     \label{fig:react_loop}
+% \end{figure}
+
+% =====================================================================
+\section{LLM routing e ottimizzazione costo--qualita'}
+\label{sec:bg-routing}
+% =====================================================================
+% TODO — Cost-quality trade-off. FrugalGPT \cite{chen2023frugalgpt}:
+% LLM cascade, early-exit basato su confidenza. RouteLLM \cite{ong2024routellm}:
+% formalizzazione del routing come classificazione strong/weak,
+% confronto Matrix Factorization / BERT classifier / Causal LLM /
+% SW Ranking. Metodologia di valutazione MMLU/MT-Bench.
+%
+% Posizionare il router di Orion nel quadro: e' un LLM-based router
+% (Gemini Flash) con output strutturato, NON un modello appreso.
+
+% =====================================================================
+\section{Stima dell'incertezza e confidence calibration}
+\label{sec:bg-confidence}
+% =====================================================================
+% TODO — Capacita' degli LLM di sapere di non sapere
+% \cite{kadavath2022knowsknows}. Self-consistency \cite{wang2022selfconsistency}
+% come proxy di confidenza (costoso). Active learning \cite{settles2012active}
+% come fondamento del meccanismo di clarification di Orion: il sistema
+% interroga l'oracolo (utente) solo quando l'informazione aggiuntiva
+% ha massimo valore.
+
+% =====================================================================
+\section{Sicurezza, privacy, compliance}
+\label{sec:bg-security}
+% =====================================================================
+% TODO — Model Armor: filtri Responsible AI e difese contro prompt
+% injection \cite{perez2022promptinjection}. Cloud DLP: PII con info types
+% standard e custom (Codice Fiscale, Partita IVA, IBAN per il contesto
+% italiano).
+
+% =====================================================================
+\section{Identity federation}
+\label{sec:bg-identity}
+% =====================================================================
+% TODO — OAuth 2.0 \cite{rfc6749oauth2}, OpenID Connect \cite{oidc1_0core},
+% JWT \cite{rfc7519jwt}. Microsoft Entra ID e MSAL come implementazione
+% adottata in Coop.
+
+% =====================================================================
+\section{Infrastruttura cloud}
+\label{sec:bg-cloud}
+% =====================================================================
+% TODO — Cloud Run come piattaforma serverless container.
+% Cloud SQL + Private Service Connect. Vertex AI: catalogo modelli +
+% RAG Engine + Grounding. Terraform come Infrastructure-as-Code.
+% Citare la documentazione ufficiale: \cite{gcp_cloudrun},
+% \cite{gcp_vertexai}, \cite{terraform_docs}.

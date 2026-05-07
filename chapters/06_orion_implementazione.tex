@@ -1,0 +1,199 @@
+% =====================================================================
+% CAPITOLO 6 — ORION: IMPLEMENTAZIONE
+% =====================================================================
+% POLPA, parte B2 di B.
+% Scopo: come e' realizzata l'architettura del Cap. 5. Backend, Frontend,
+% Admin Panel, Infrastruttura. Dettagli tecnici sufficienti a convincere
+% della SOLIDITA'.
+%
+% Riferimento principale: plans/ORION_ROADMAP.md (sez. 2-5).
+% Ordine di scrittura: terzo (dopo Cap. 3-4-5), parallelamente allo
+% sviluppo del codice di Orion.
+% =====================================================================
+
+\chapter{Orion: implementazione}
+\label{chap:orion-implementazione}
+
+% =====================================================================
+\section{Backend Orion}
+\label{sec:orion-impl-backend}
+% =====================================================================
+% TODO — Forking di vera-backend come base. Motivazione: Orion eredita
+% la pipeline RAG + web search di Vera per il fallback `agent == "self"`.
+
+\subsection{Setup e struttura della repository}
+\label{subsec:orion-impl-setup}
+% TODO — Directory `orion-backend/`, rinominazione di riferimenti
+% ("vera" -> "orion"), API prefix /api/orion, log labels.
+% Dipendenze aggiuntive: `httpx` per le chiamate proxy async ai sub-agenti.
+
+\subsection{Router agent (\texttt{app/agents/router\_agent.py})}
+\label{subsec:orion-impl-router}
+% TODO — Modulo nuovo. Implementazione del routing step:
+% - Costruzione del prompt: system prompt (caricato da app_settings o
+%   da file di configurazione), descrizione di ogni agente disponibile,
+%   esempi few-shot, mapping complexity -> modello target.
+% - Chiamata Vertex AI (Gemini Flash) con structured output / tool use.
+% - Parsing dell'output e validazione dello schema.
+% - Logging di reasoning + confidence per analisi successiva.
+
+% [LISTATO 6.1] Snippet del router_agent.classify(): chiamata a Vertex AI
+% con response_schema (Pydantic).
+
+\subsection{Agent proxy (\texttt{app/services/agent\_proxy.py})}
+\label{subsec:orion-impl-proxy}
+% TODO — Tabella endpoint di tutti i sub-agenti (URL via env var,
+% endpoint /prompt). Payload comune: prompt, history, conversation_id,
+% complexity (campo opzionale, non-breaking per i sub-agenti che non
+% lo gestiscono ancora).
+% Normalizzazione delle response shape verso un formato uniforme.
+% Gestione errori: timeout, 4xx/5xx -> fallback su pipeline self.
+
+% [LISTATO 6.2] Funzione di normalizzazione delle response: queries[],
+% sources[], charts[] -> shape uniforme.
+
+\subsection{Integrazione nel chat endpoint}
+\label{subsec:orion-impl-chat}
+% TODO — Modifiche a `app/api/chat.py` e `chat_stream.py`. Pseudocodice:
+%
+% receive request
+%   -> [NUOVO] router_agent.classify(prompt, history, token_payload)
+%   -> if clarification_needed -> return clarification response
+%   -> if agent != "self"      -> agent_proxy.forward(...)
+%   -> else                    -> normal Vera pipeline
+%
+% Inserire diagramma o pseudocodice come listato.
+
+\subsection{Endpoint dedicato \texttt{/classify} per la valutazione}
+\label{subsec:orion-impl-classify}
+% TODO — Endpoint POST /api/orion/classify che espone SOLO il routing
+% step (senza eseguire la risposta del sub-agente).
+% Body: { "prompt": "...", "history": [] }
+% Response: { "agent", "complexity", "confidence", "reasoning" }
+%
+% Motivazione: usato dallo script di valutazione (Cap. 7) per testare
+% il router in modo economico (solo una Flash call per test case)
+% e indipendente dai sub-agenti.
+
+\subsection{Variabili d'ambiente e configurazione}
+\label{subsec:orion-impl-env}
+% TODO — Tabella delle env var aggiuntive rispetto a Vera:
+% - SYSAID_BACKEND_URL, SYSAID_SONNET_BACKEND_URL,
+%   NPS_BACKEND_URL, DOCS_BACKEND_URL: URL interni Cloud Run dei sub-agenti.
+% - ROUTER_CONFIDENCE_THRESHOLD: default 0.60.
+% - ROUTER_MODEL: default gemini-2.5-flash.
+
+% =====================================================================
+\section{Frontend Orion (chat)}
+\label{sec:orion-impl-frontend}
+% =====================================================================
+
+\subsection{Setup e branding}
+\label{subsec:orion-impl-fe-setup}
+% TODO — Fork di vera-frontend, package.json aggiornato, base URL
+% /api/orion. Branding: tema astronomico (costellazioni), palette colori,
+% logo, copy aggiornati.
+
+\subsection{UI per il routing trasparente}
+\label{subsec:orion-impl-fe-routing}
+% TODO — Scelta: rendere visibile all'utente quale agente ha gestito
+% la risposta. Motivazione: valore dimostrativo per la tesi, e fiducia
+% per l'utente. Implementazione:
+% - Badge sopra la risposta: "Risposta generata da: SysAid Sonnet —
+%   Complessita': Alta".
+% - Indicatore di confidence (utile in demo).
+% - Stile distinto per i messaggi di clarification.
+
+\subsection{Gestione delle response shape eterogenee}
+\label{subsec:orion-impl-fe-shapes}
+% TODO — Renderer adattivo che gestisce sources[] (CooPolicy),
+% queries[]/charts[] (SysAid/NPS), citations[] (Vera) in modo unificato
+% sulla base del campo `agent_used`.
+
+% =====================================================================
+\section{Admin Panel di Orion}
+\label{sec:orion-impl-admin}
+% =====================================================================
+% TODO — Pattern del progetto: hub admin-portal-frontend -> N admin
+% frontend dedicati. Aggiunta della card Orion all'hub.
+% Backend admin: prefisso /api/orion-admin (vs /api/admin di Vera) sullo
+% stesso servizio orion-backend.
+%
+% Distinguere endpoint EREDITATI da Vera (users, logs, stats, settings,
+% plans, starters, ai-models, feedback, pii-groups) da endpoint NUOVI
+% specifici di Orion:
+% - GET /api/orion-admin/routing-logs: log decision-by-decision.
+% - GET /api/orion-admin/routing-stats: metriche aggregate.
+% - GET/PUT /api/orion-admin/router-prompt: editor del system prompt.
+% - GET /api/orion-admin/router-prompt/history: versioning.
+
+\subsection{Pagine nuove}
+\label{subsec:orion-impl-admin-pages}
+% TODO — Tre pagine nuove nel frontend admin di Orion:
+%
+% RoutingLogs.tsx: tabella paginata dei turni con timestamp, username,
+% prompt excerpt, agente selezionato, complexity, confidence
+% (color-coded), clarification yes/no. Click su riga -> espansione
+% del reasoning completo.
+%
+% RouterPrompt.tsx: editor con textarea del system prompt, campo versione,
+% note di release, bottone "Salva e Attiva".
+%
+% RouterMetrics.tsx: KPI (Agent Accuracy %, Complexity Accuracy %,
+% Clarification Rate %, Mean Confidence) + bar chart accuracy per
+% agente + timeline accuracy per data + istogramma confidence.
+
+% [FIGURA 6.1] Mockup di RouterMetrics.tsx (screenshot del pannello).
+%
+% \begin{figure}[h]
+%     \centering
+%     \includegraphics[width=\textwidth]{fig06_admin_router_metrics.pdf}
+%     \caption[Pagina RouterMetrics dell'admin panel]{La pagina \texttt{RouterMetrics} dell'admin panel di Orion: KPI di agent/complexity accuracy, bar chart per agente, distribuzione di confidence e timeline storica.}
+%     \label{fig:admin_router_metrics}
+% \end{figure}
+
+% =====================================================================
+\section{Infrastruttura Terraform}
+\label{sec:orion-impl-iac}
+% =====================================================================
+% TODO — Tre nuovi servizi in `var.cloud_run_services`: orion-backend,
+% orion-frontend, orion-admin-frontend. Env var specifiche per ciascuno.
+% Cloud Build trigger per branch test e main.
+% URL mapping nel Load Balancer:
+%   /orion/*            -> orion-frontend
+%   /orion-admin/*      -> orion-admin-frontend
+%   /api/orion/*        -> orion-backend
+%   /api/orion-admin/*  -> orion-backend (stesso servizio, prefisso diverso)
+% Aggiornamento del certificato SSL se necessario.
+
+% =====================================================================
+\section{Database e schema dei log di routing}
+\label{sec:orion-impl-db}
+% =====================================================================
+% TODO — Cloud SQL: database dedicato per Orion (stesso pattern degli
+% altri agenti). Migration per la tabella `orion_routing_logs`:
+%
+% CREATE TABLE orion_routing_logs (
+%   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+%   username VARCHAR(255) NOT NULL,
+%   conversation_id UUID,
+%   prompt_excerpt VARCHAR(500),
+%   agent_selected VARCHAR(50),
+%   complexity VARCHAR(20),
+%   confidence FLOAT,
+%   clarification_asked BOOLEAN DEFAULT false,
+%   reasoning TEXT,
+%   created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+% );
+%
+% Migration per app_settings key `router_system_prompt` (seed iniziale).
+
+% [FIGURA 6.2] Mini-ER schema del database Orion: orion_conversations
+% -> orion_messages -> orion_routing_logs.
+%
+% \begin{figure}[h]
+%     \centering
+%     \includegraphics[width=0.7\textwidth]{fig06_orion_er.pdf}
+%     \caption[Schema dei log di routing]{Schema relazionale (estratto) del database di Orion: conversazioni, messaggi e log di routing legati per \texttt{conversation\_id}.}
+%     \label{fig:orion_er}
+% \end{figure}

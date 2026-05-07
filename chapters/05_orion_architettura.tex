@@ -1,0 +1,173 @@
+% =====================================================================
+% CAPITOLO 5 — ORION: ARCHITETTURA
+% =====================================================================
+% POLPA, parte B1 di B (B = orchestratore Orion).
+% Scopo: descrivere il design dell'orchestratore. Decisioni progettuali
+% e loro motivazioni, non ancora il codice.
+%
+% Riferimento principale: plans/ORION_ROADMAP.md (sez. 1, 2, 9).
+% =====================================================================
+
+\chapter{Orion: architettura}
+\label{chap:orion-architettura}
+
+% =====================================================================
+\section{Motivazione e visione architetturale}
+\label{sec:orion-motivazione}
+% =====================================================================
+% TODO — Aprire il capitolo richiamando il limite del modello v1
+% della suite (utente sceglie esplicitamente l'agente). Problemi:
+% - Carico cognitivo per l'utente.
+% - Errori di selezione (utente sceglie l'agente sbagliato).
+% - Impossibilita' di richieste ibride.
+%
+% Visione di Orion: orchestratore intelligente che eredita le capacita'
+% di Vera (RAG, web search, guardrail) e aggiunge un layer di routing
+% che instrada le richieste sulla base di (intento, complessita', confidenza).
+%
+% Citare \cite{wu2023autogen} per il pattern orchestratore-agenti
+% specializzati e \cite{wang2024moa} per la terminologia
+% Mixture-of-Agents.
+
+% [FIGURA 5.1] Architettura ad alto livello di Orion: Frontend ->
+% Backend Orion -> Router step -> [self | sysaid_gemini | sysaid_sonnet
+% | allycare | coopolicy] -> Sub-agent backend -> Response normalization.
+%
+% \begin{figure}[h]
+%     \centering
+%     \includegraphics[width=\textwidth]{fig05_orion_architettura.pdf}
+%     \caption[Architettura di Orion]{Architettura dell'orchestratore Orion: il routing step LLM-based seleziona dinamicamente quale agente specializzato invocare; il proxy normalizza le risposte; la pipeline Vera (RAG + web search) resta come fallback su \texttt{agent == "self"}.}
+%     \label{fig:orion_architettura}
+% \end{figure}
+
+% =====================================================================
+\section{Il routing step: stima di intento, complessita', confidenza}
+\label{sec:orion-routing}
+% =====================================================================
+
+\subsection{Output strutturato del router}
+\label{subsec:orion-output-strutturato}
+% TODO — Schema dell'output del router (ricavato da ORION_ROADMAP.md):
+%   {
+%     "agent": "self | sysaid_gemini | sysaid_sonnet | allycare | coopolicy",
+%     "complexity": "low | medium | high",
+%     "confidence": 0.0..1.0,
+%     "reasoning": "Chain of Thought esplicita",
+%     "clarification_needed": null | "<domanda all'utente>"
+%   }
+%
+% Motivazioni:
+% - "agent": classificazione di intento -> selezione dell'agente.
+% - "complexity": passata as-is ai sub-agenti per il loro routing
+%   modello interno (es. sysaid: low -> Flash, high -> Pro/Sonnet).
+% - "confidence": calibrazione del routing (Cap. 7).
+% - "reasoning": Chain-of-Thought \cite{wei2022cot} -> migliore
+%   accuracy + tracciabilita' delle decisioni.
+% - "clarification_needed": meccanismo human-in-the-loop
+%   \cite{settles2012active}.
+
+\subsection{Logica di confidence e clarification}
+\label{subsec:orion-confidence}
+% TODO — Tre fasce con soglie:
+% - confidence >= 0.80 -> routing diretto.
+% - 0.60 <= confidence < 0.80 -> routing con warning loggato.
+% - confidence < 0.60 -> NO routing, risposta di clarification all'utente.
+%
+% Riferimenti teorici:
+% - \cite{kadavath2022knowsknows}: gli LLM grandi sono ragionevolmente
+%   calibrati quando interrogati esplicitamente sulla propria certezza.
+% - \cite{wang2022selfconsistency}: alternativa piu' costosa (multiple
+%   sample + voto) — discussa ma scartata per ragioni di costo.
+
+% [FIGURA 5.2] Decision flow del routing: input -> classify -> 3 rami
+% in base a confidence -> action.
+%
+% \begin{figure}[h]
+%     \centering
+%     \includegraphics[width=0.9\textwidth]{fig05_routing_decision.pdf}
+%     \caption[Routing decision flow]{Logica di routing: in funzione della soglia di confidenza, Orion instrada direttamente, instrada con warning, oppure pone all'utente una domanda di chiarimento.}
+%     \label{fig:routing_decision}
+% \end{figure}
+
+\subsection{Scelta del modello per il routing}
+\label{subsec:orion-model-routing}
+% TODO — Scelta: Gemini Flash come router. Motivazioni:
+% - velocita' (latenza p50 sub-secondo).
+% - costo per call ridotto (consente di chiamare il router su OGNI
+%   request senza impatto economico significativo).
+% - capacita' sufficiente per il task: classificazione vincolata su
+%   un set chiuso di etichette + estrazione di confidence.
+%
+% Alternativa Pro discussa e scartata per costo.
+% Alternativa "router appreso" (RouteLLM-style \cite{ong2024routellm})
+% discussa come direzione futura (Cap. 8).
+
+% =====================================================================
+\section{Agent proxy e normalizzazione delle risposte}
+\label{sec:orion-proxy}
+% =====================================================================
+% TODO — Il proxy invoca il backend del sub-agente via HTTP interno
+% (Cloud Run-to-Cloud Run su URL `.run.app`). Decisioni rilevanti:
+%
+% 1) NESSUNA modifica ai backend dei sub-agenti: l'adattamento e' tutto
+%    nel proxy. Motivazione: stabilita', isolamento dei fallimenti.
+%
+% 2) Token Entra ID forwardato as-is al sub-agente (non un service account
+%    dedicato). Motivazione: il sub-agente vede l'utente reale (e quindi
+%    le sue ACL: cfr. CooPolicy che ha gruppi specifici).
+%
+% 3) Normalizzazione delle risposte: shape eterogenee (SysAid: queries[]
+%    + charts[]; CooPolicy: sources[]; Vera: text + citations[]) ->
+%    formato uniforme per il frontend Orion.
+%
+% 4) Gestione errori e fallback: se un sub-agente risponde 4xx/5xx o va
+%    in timeout, Orion gestisce la richiesta con la pipeline interna (self).
+
+% [FIGURA 5.3] Sequence diagram di un turno completo: utente -> Orion
+% Frontend -> Orion Backend -> Router (Flash) -> Agent Proxy -> Sub-agent
+% Backend (es. SysAid Sonnet) -> Risposta normalizzata -> SSE -> utente.
+%
+% \begin{figure}[h]
+%     \centering
+%     \includegraphics[width=\textwidth]{fig05_orion_sequence.pdf}
+%     \caption[Sequence diagram di un turno Orion]{Sequence diagram completo: dalla richiesta utente al routing, dall'invocazione del sub-agente alla normalizzazione della risposta.}
+%     \label{fig:orion_sequence}
+% \end{figure}
+
+% =====================================================================
+\section{Gestione delle ACL e dell'identita'}
+\label{sec:orion-acl}
+% =====================================================================
+% TODO — Vincolo specifico di CooPolicy: solo gruppi autorizzati.
+% Decisione: prima di fare routing su `coopolicy`, verificare che il
+% token_payload["groups"] contenga almeno uno dei DOCS_ALLOWED_GROUPS.
+% Se utente NON autorizzato: ESCLUDERE coopolicy dal set dei target
+% nel prompt del router (non esporre l'esistenza dell'agente).
+
+% =====================================================================
+\section{Conversation threading e gestione della storia}
+\label{sec:orion-history}
+% =====================================================================
+% TODO — Decisione: HISTORY UNICA in Orion (Opzione A del roadmap).
+% Tutti i turni di tutti gli agenti sono memorizzati nella stessa
+% conversazione di Orion.
+% Motivazione: continuita' dell'esperienza utente; possibilita' di
+% turni che cambiano agente all'interno della stessa conversazione.
+% Trade-off: ogni sub-agente riceve solo la slice di history che lo
+% riguarda.
+
+% =====================================================================
+\section{Decisioni architetturali aperte e perche' sono state risolte cosi'}
+\label{sec:orion-decisioni}
+% =====================================================================
+% TODO — Riprendere la tabella della sez. 9 di ORION_ROADMAP.md e
+% trasformarla in narrativa. Decisioni risolte:
+% - Modello routing: Flash.
+% - Threshold confidence: 0.60 (calibrato in Cap. 7).
+% - History: unica in Orion.
+% - Routing trasparente all'utente: SI (badge che mostra l'agente).
+% - Streaming proxy: bufferizzato (non SSE pass-through) per semplicita' v1.
+% - Versioning system prompt: file in repo (tag git = versione).
+%
+% Per ognuna: opzioni considerate, motivazione della scelta, eventuali
+% trade-off accettati.

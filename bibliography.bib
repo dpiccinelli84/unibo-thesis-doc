@@ -1,0 +1,491 @@
+% =====================================================================
+% BIBLIOGRAFIA — Tesi Davide Piccinelli
+% Voci unificate da:
+%   - github/unibo/prova-finale/bibliografia.md
+%   - plans/ORION_LETTERATURA.md
+% Stile: BibLaTeX (biber). Ordinamento: per filone tematico.
+% =====================================================================
+
+
+% =====================================================================
+% Filone 1 — Fondamenti: Transformer e LLM
+% =====================================================================
+
+@inproceedings{vaswani2017attention,
+  title     = {Attention is All You Need},
+  author    = {Vaswani, Ashish and Shazeer, Noam and Parmar, Niki and
+               Uszkoreit, Jakob and Jones, Llion and Gomez, Aidan N. and
+               Kaiser, {\L}ukasz and Polosukhin, Illia},
+  booktitle = {Advances in Neural Information Processing Systems 30 (NeurIPS)},
+  year      = {2017},
+  url       = {https://arxiv.org/abs/1706.03762}
+}
+
+@inproceedings{brown2020gpt3,
+  title     = {Language Models are Few-Shot Learners},
+  author    = {Brown, Tom B. and Mann, Benjamin and Ryder, Nick and others},
+  booktitle = {Advances in Neural Information Processing Systems 33 (NeurIPS)},
+  year      = {2020},
+  url       = {https://arxiv.org/abs/2005.14165}
+}
+
+@inproceedings{ouyang2022instructgpt,
+  title     = {Training Language Models to Follow Instructions with Human Feedback},
+  author    = {Ouyang, Long and Wu, Jeff and Jiang, Xu and others},
+  booktitle = {Advances in Neural Information Processing Systems 35 (NeurIPS)},
+  year      = {2022},
+  url       = {https://arxiv.org/abs/2203.02155}
+}
+
+@article{chang2023llmsurvey,
+  title   = {A Survey on Evaluation of Large Language Models},
+  author  = {Chang, Yupeng and Wang, Xu and Wang, Jindong and others},
+  journal = {arXiv preprint arXiv:2307.03109},
+  year    = {2023},
+  url     = {https://arxiv.org/abs/2307.03109}
+}
+
+@article{xu2024hallucination,
+  title   = {Hallucination is Inevitable: An Innate Limitation of Large Language Models},
+  author  = {Xu, Ziwei and Jain, Sanjay and Kankanhalli, Mohan},
+  journal = {arXiv preprint arXiv:2401.11817},
+  year    = {2024},
+  url     = {https://arxiv.org/abs/2401.11817}
+}
+
+
+% =====================================================================
+% Filone 2 — Prompt engineering, ragionamento, tool use
+% =====================================================================
+
+@inproceedings{wei2022cot,
+  title     = {Chain-of-Thought Prompting Elicits Reasoning in Large Language Models},
+  author    = {Wei, Jason and Wang, Xuezhi and Schuurmans, Dale and others},
+  booktitle = {Advances in Neural Information Processing Systems 35 (NeurIPS)},
+  year      = {2022},
+  url       = {https://arxiv.org/abs/2201.11903}
+}
+
+@inproceedings{yao2022react,
+  title     = {ReAct: Synergizing Reasoning and Acting in Language Models},
+  author    = {Yao, Shunyu and Zhao, Jeffrey and Yu, Dian and Du, Nan and
+               Shafran, Izhak and Narasimhan, Karthik and Cao, Yuan},
+  booktitle = {International Conference on Learning Representations (ICLR)},
+  year      = {2023},
+  url       = {https://arxiv.org/abs/2210.03629}
+}
+
+@article{wang2022selfconsistency,
+  title   = {Self-Consistency Improves Chain of Thought Reasoning in Language Models},
+  author  = {Wang, Xuezhi and Wei, Jason and Schuurmans, Dale and Le, Quoc and
+             Chi, Ed and Narang, Sharan and Chowdhery, Aakanksha and Zhou, Denny},
+  journal = {arXiv preprint arXiv:2203.11171},
+  year    = {2022},
+  url     = {https://arxiv.org/abs/2203.11171}
+}
+
+@article{sahoo2024prompteng_survey,
+  title   = {A Systematic Survey of Prompt Engineering in Large Language Models: Techniques and Applications},
+  author  = {Sahoo, Pranab and Singh, Ayush Kumar and Saha, Sriparna and others},
+  journal = {arXiv preprint arXiv:2402.07927},
+  year    = {2024},
+  url     = {https://arxiv.org/abs/2402.07927}
+}
+
+
+% =====================================================================
+% Filone 3 — Retrieval-Augmented Generation (RAG)
+% =====================================================================
+
+@inproceedings{lewis2020rag,
+  title     = {Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks},
+  author    = {Lewis, Patrick and Perez, Ethan and Piktus, Aleksandra and others},
+  booktitle = {Advances in Neural Information Processing Systems 33 (NeurIPS)},
+  year      = {2020},
+  url       = {https://arxiv.org/abs/2005.11401}
+}
+
+@inproceedings{guu2020realm,
+  title     = {{REALM}: Retrieval-Augmented Language Model Pre-Training},
+  author    = {Guu, Kelvin and Lee, Kenton and Tung, Zora and Pasupat, Panupong and Chang, Ming-Wei},
+  booktitle = {International Conference on Machine Learning (ICML)},
+  year      = {2020},
+  url       = {https://arxiv.org/abs/2002.08909}
+}
+
+@article{gao2022hyde,
+  title   = {Precise Zero-Shot Dense Retrieval without Relevance Labels},
+  author  = {Gao, Luyu and Ma, Xueguang and Lin, Jimmy and Callan, Jamie},
+  journal = {arXiv preprint arXiv:2212.10496},
+  year    = {2022},
+  url     = {https://arxiv.org/abs/2212.10496}
+}
+
+@article{ma2023query_expansion,
+  title   = {Query Expansion by Prompting Large Language Models},
+  author  = {Ma, Xueguang and Wang, Liang and Yang, Nan and Wei, Furu and Lin, Jimmy},
+  journal = {arXiv preprint arXiv:2305.03653},
+  year    = {2023},
+  url     = {https://arxiv.org/abs/2305.03653}
+}
+
+
+% =====================================================================
+% Filone 4 — Valutazione di sistemi RAG e LLM
+% =====================================================================
+
+@article{es2023ragas,
+  title   = {{RAGAS}: Automated Evaluation of Retrieval Augmented Generation},
+  author  = {Es, Shahul and James, Jithin and Espinosa-Anke, Luis and Schockaert, Steven},
+  journal = {arXiv preprint arXiv:2309.15217},
+  year    = {2023},
+  url     = {https://arxiv.org/abs/2309.15217}
+}
+
+@inproceedings{zheng2023llmjudge,
+  title     = {Judging {LLM}-as-a-Judge with {MT-Bench} and {Chatbot Arena}},
+  author    = {Zheng, Lianmin and Chiang, Wei-Lin and Sheng, Ying and others},
+  booktitle = {Advances in Neural Information Processing Systems 36 (NeurIPS)},
+  year      = {2023},
+  url       = {https://arxiv.org/abs/2306.05685}
+}
+
+@article{liu2023agentbench,
+  title   = {{AgentBench}: Evaluating {LLMs} as Agents},
+  author  = {Liu, Xiao and Yu, Hao and Zhang, Hanchen and others},
+  journal = {arXiv preprint arXiv:2308.03688},
+  year    = {2023},
+  url     = {https://arxiv.org/abs/2308.03688}
+}
+
+@article{liang2022helm,
+  title   = {Holistic Evaluation of Language Models},
+  author  = {Liang, Percy and Bommasani, Rishi and Lee, Tony and others},
+  journal = {arXiv preprint arXiv:2211.09110},
+  year    = {2022},
+  url     = {https://arxiv.org/abs/2211.09110}
+}
+
+@misc{ragas_docs,
+  title        = {{RAGAS} — Documentazione del framework},
+  author       = {{Exploding Gradients}},
+  year         = {2024},
+  howpublished = {\url{https://docs.ragas.io/}},
+  note         = {Consultato nel 2026}
+}
+
+
+% =====================================================================
+% Filone 5 — Text-to-SQL
+% =====================================================================
+
+@inproceedings{yu2018spider,
+  title     = {{Spider}: A Large-Scale Human-Labeled Dataset for Complex and
+               Cross-Domain Semantic Parsing and Text-to-{SQL} Task},
+  author    = {Yu, Tao and Zhang, Rui and Yang, Kai and others},
+  booktitle = {Conference on Empirical Methods in Natural Language Processing (EMNLP)},
+  year      = {2018},
+  url       = {https://arxiv.org/abs/1809.08887}
+}
+
+@inproceedings{li2023bird,
+  title     = {Can {LLM} Already Serve as A Database Interface? A Big Bench for
+               Large-Scale Database Grounded Text-to-{SQLs}},
+  author    = {Li, Jinyang and Hui, Binyuan and Qu, Ge and others},
+  booktitle = {Advances in Neural Information Processing Systems 36 (NeurIPS)},
+  year      = {2023},
+  url       = {https://arxiv.org/abs/2305.03111}
+}
+
+@article{pourreza2023dinsql,
+  title   = {{DIN-SQL}: Decomposed In-Context Learning of Text-to-{SQL} with Self-Correction},
+  author  = {Pourreza, Mohammadreza and Rafiei, Davood},
+  journal = {arXiv preprint arXiv:2304.11015},
+  year    = {2023},
+  url     = {https://arxiv.org/abs/2304.11015}
+}
+
+
+% =====================================================================
+% Filone 6 — Multi-Agent LLM e Orchestrazione
+% =====================================================================
+
+@article{wu2023autogen,
+  title   = {{AutoGen}: Enabling Next-Gen {LLM} Applications via Multi-Agent Conversation},
+  author  = {Wu, Qingyun and Bansal, Gagan and Zhang, Jieyu and others},
+  journal = {arXiv preprint arXiv:2308.08155},
+  year    = {2023},
+  url     = {https://arxiv.org/abs/2308.08155}
+}
+
+@article{guo2024multiagent,
+  title   = {Large Language Model based Multi-Agents: A Survey of Progress and Challenges},
+  author  = {Guo, Taicheng and Chen, Xiuying and Wang, Yaqi and others},
+  journal = {arXiv preprint arXiv:2402.01680},
+  year    = {2024},
+  url     = {https://arxiv.org/abs/2402.01680}
+}
+
+@article{wang2024moa,
+  title   = {Mixture-of-Agents Enhances Large Language Model Capabilities},
+  author  = {Wang, Junlin and Wang, Jue and Athiwaratkun, Ben and
+             Zhang, Ce and Zou, James},
+  journal = {arXiv preprint arXiv:2406.04692},
+  year    = {2024},
+  url     = {https://arxiv.org/abs/2406.04692}
+}
+
+@article{jiang2024mixtral,
+  title   = {Mixtral of Experts},
+  author  = {Jiang, Albert Q. and Sablayrolles, Alexandre and Roux, Antoine and others},
+  journal = {arXiv preprint arXiv:2401.04088},
+  year    = {2024},
+  url     = {https://arxiv.org/abs/2401.04088}
+}
+
+@misc{langchain_docs,
+  title        = {{LangChain} Documentation},
+  author       = {{LangChain}},
+  year         = {2024},
+  howpublished = {\url{https://python.langchain.com/docs/introduction/}},
+  note         = {Consultato nel 2026}
+}
+
+@misc{llamaindex_docs,
+  title        = {{LlamaIndex} Documentation},
+  author       = {{LlamaIndex}},
+  year         = {2024},
+  howpublished = {\url{https://docs.llamaindex.ai/}},
+  note         = {Consultato nel 2026}
+}
+
+@misc{google_adk_docs,
+  title        = {{Google Agent Development Kit (ADK)} — Documentation},
+  author       = {{Google}},
+  year         = {2024},
+  howpublished = {\url{https://google.github.io/adk-docs/}},
+  note         = {Consultato nel 2026}
+}
+
+
+% =====================================================================
+% Filone 7 — LLM Routing e ottimizzazione costo-qualita'
+% =====================================================================
+
+@article{chen2023frugalgpt,
+  title   = {{FrugalGPT}: How to Use Large Language Models While Reducing Cost and Improving Performance},
+  author  = {Chen, Lingjiao and Zaharia, Matei and Zou, James},
+  journal = {arXiv preprint arXiv:2305.05176},
+  year    = {2023},
+  url     = {https://arxiv.org/abs/2305.05176}
+}
+
+@article{ong2024routellm,
+  title   = {{RouteLLM}: Learning to Route {LLMs} with Preference Data},
+  author  = {Ong, Isaac and Almahairi, Amjad and Wu, Vincent and others},
+  journal = {arXiv preprint arXiv:2406.18665},
+  year    = {2024},
+  url     = {https://arxiv.org/abs/2406.18665}
+}
+
+@misc{routellm_repo,
+  title        = {{RouteLLM} — Repository ufficiale},
+  author       = {{LMSYS Org}},
+  year         = {2024},
+  howpublished = {\url{https://github.com/lm-sys/RouteLLM}},
+  note         = {Consultato nel 2026}
+}
+
+
+% =====================================================================
+% Filone 8 — Stima dell'incertezza / Active Learning
+% =====================================================================
+
+@article{kadavath2022knowsknows,
+  title   = {Language Models (Mostly) Know What They Know},
+  author  = {Kadavath, Saurav and Conerly, Tom and Askell, Amanda and others},
+  journal = {arXiv preprint arXiv:2207.05221},
+  year    = {2022},
+  url     = {https://arxiv.org/abs/2207.05221}
+}
+
+@book{settles2012active,
+  title     = {Active Learning},
+  author    = {Settles, Burr},
+  series    = {Synthesis Lectures on Artificial Intelligence and Machine Learning},
+  publisher = {Morgan \& Claypool},
+  year      = {2012}
+}
+
+@article{diao2023activeprompting,
+  title   = {Active Prompting with Chain-of-Thought for Large Language Models},
+  author  = {Diao, Shizhe and Wang, Pengcheng and Lin, Yong and Zhang, Tong},
+  journal = {arXiv preprint arXiv:2302.12246},
+  year    = {2023},
+  url     = {https://arxiv.org/abs/2302.12246}
+}
+
+
+% =====================================================================
+% Filone 9 — Sicurezza, privacy, prompt injection
+% =====================================================================
+
+@article{perez2022promptinjection,
+  title   = {Ignore Previous Prompt: Attack Techniques For Language Models},
+  author  = {Perez, F{\'a}bio and Ribeiro, Ian},
+  journal = {arXiv preprint arXiv:2211.09527},
+  year    = {2022},
+  url     = {https://arxiv.org/abs/2211.09527}
+}
+
+@misc{gcp_modelarmor,
+  title        = {{Google Cloud} — Model Armor},
+  author       = {{Google}},
+  year         = {2025},
+  howpublished = {\url{https://cloud.google.com/security-command-center/docs/model-armor-overview}},
+  note         = {Consultato nel 2026}
+}
+
+@misc{gcp_dlp,
+  title        = {{Google Cloud} — Sensitive Data Protection (DLP)},
+  author       = {{Google}},
+  year         = {2025},
+  howpublished = {\url{https://cloud.google.com/sensitive-data-protection/docs}},
+  note         = {Consultato nel 2026}
+}
+
+
+% =====================================================================
+% Filone 10 — Identity federation e protocolli
+% =====================================================================
+
+@misc{rfc6749oauth2,
+  title        = {{RFC 6749}: The {OAuth} 2.0 Authorization Framework},
+  author       = {Hardt, Dick},
+  year         = {2012},
+  howpublished = {\url{https://www.rfc-editor.org/rfc/rfc6749}},
+  organization = {IETF}
+}
+
+@misc{oidc1_0core,
+  title        = {{OpenID Connect Core 1.0}},
+  author       = {Sakimura, Nat and Bradley, John and Jones, Mike and de Medeiros, Breno and Mortimore, Chuck},
+  year         = {2014},
+  howpublished = {\url{https://openid.net/specs/openid-connect-core-1_0.html}},
+  organization = {OpenID Foundation}
+}
+
+@misc{rfc7519jwt,
+  title        = {{RFC 7519}: {JSON Web Token (JWT)}},
+  author       = {Jones, Michael and Bradley, John and Sakimura, Nat},
+  year         = {2015},
+  howpublished = {\url{https://www.rfc-editor.org/rfc/rfc7519}},
+  organization = {IETF}
+}
+
+@misc{msft_entra_id,
+  title        = {{Microsoft Entra ID} — Documentazione ufficiale},
+  author       = {{Microsoft}},
+  year         = {2024},
+  howpublished = {\url{https://learn.microsoft.com/en-us/entra/identity/}},
+  note         = {Consultato nel 2026}
+}
+
+@misc{msft_msal,
+  title        = {{Microsoft Authentication Library (MSAL)}},
+  author       = {{Microsoft}},
+  year         = {2024},
+  howpublished = {\url{https://learn.microsoft.com/en-us/entra/identity-platform/msal-overview}},
+  note         = {Consultato nel 2026}
+}
+
+
+% =====================================================================
+% Filone 11 — Usabilita' e valutazione con utenti
+% =====================================================================
+
+@incollection{brooke1996sus,
+  title     = {{SUS}: A "quick and dirty" usability scale},
+  author    = {Brooke, John},
+  booktitle = {Usability Evaluation in Industry},
+  editor    = {Jordan, Patrick W. and Thomas, Bruce and Weerdmeester, Bernard A. and McClelland, Ian Lyall},
+  publisher = {Taylor \& Francis},
+  year      = {1996}
+}
+
+@misc{nielsen2000fiveusers,
+  title        = {Why You Only Need to Test with 5 Users},
+  author       = {Nielsen, Jakob},
+  year         = {2000},
+  howpublished = {\url{https://www.nngroup.com/articles/why-you-only-need-to-test-with-5-users/}},
+  note         = {Consultato nel 2026}
+}
+
+
+% =====================================================================
+% Filone 12 — Infrastruttura cloud e servizi managed
+% =====================================================================
+
+@misc{gcp_vertexai,
+  title        = {{Google Cloud} — {Vertex AI} (panoramica)},
+  author       = {{Google}},
+  year         = {2025},
+  howpublished = {\url{https://cloud.google.com/vertex-ai/docs}},
+  note         = {Consultato nel 2026}
+}
+
+@misc{gcp_vertex_rag,
+  title        = {{Google Cloud} — {Vertex AI RAG Engine}},
+  author       = {{Google}},
+  year         = {2025},
+  howpublished = {\url{https://cloud.google.com/vertex-ai/generative-ai/docs/rag-overview}},
+  note         = {Consultato nel 2026}
+}
+
+@misc{gcp_grounding,
+  title        = {{Google Cloud} — Grounding with {Google Search}},
+  author       = {{Google}},
+  year         = {2025},
+  howpublished = {\url{https://cloud.google.com/vertex-ai/generative-ai/docs/grounding/overview}},
+  note         = {Consultato nel 2026}
+}
+
+@misc{gcp_cloudrun,
+  title        = {{Google Cloud Run} — Documentazione},
+  author       = {{Google}},
+  year         = {2025},
+  howpublished = {\url{https://cloud.google.com/run/docs}},
+  note         = {Consultato nel 2026}
+}
+
+@misc{gcp_cloudsql,
+  title        = {{Google Cloud SQL} — {PostgreSQL} managed},
+  author       = {{Google}},
+  year         = {2025},
+  howpublished = {\url{https://cloud.google.com/sql/docs/postgres}},
+  note         = {Consultato nel 2026}
+}
+
+@misc{gcp_bigquery,
+  title        = {{Google BigQuery} — Documentazione},
+  author       = {{Google}},
+  year         = {2025},
+  howpublished = {\url{https://cloud.google.com/bigquery/docs}},
+  note         = {Consultato nel 2026}
+}
+
+@misc{terraform_docs,
+  title        = {{HashiCorp Terraform} — Documentazione},
+  author       = {{HashiCorp}},
+  year         = {2025},
+  howpublished = {\url{https://developer.hashicorp.com/terraform/docs}},
+  note         = {Consultato nel 2026}
+}
+
+@misc{anthropic_docs,
+  title        = {{Anthropic Claude} — API Documentation},
+  author       = {{Anthropic}},
+  year         = {2025},
+  howpublished = {\url{https://docs.claude.com/}},
+  note         = {Consultato nel 2026}
+}

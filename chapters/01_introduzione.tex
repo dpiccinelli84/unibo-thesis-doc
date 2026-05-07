@@ -1,0 +1,160 @@
+% =====================================================================
+% CAPITOLO 1 — INTRODUZIONE
+% =====================================================================
+% Scopo (linee guida del prof): stabilire il contesto, identificare il/i
+% problema/i affrontato/i, anticipare i contributi. Forma "a imbuto":
+% campo informatico ampio -> problemi specifici -> domande di ricerca
+% -> contributi della tesi.
+%
+% Esercizio della "macchina del tempo": scrivere come se si dovesse
+% spiegare il lavoro a se stessi prima di iniziarlo. Lettore target:
+% studente di informatica magistrale NON specialista del settore LLM/AI.
+%
+% Ordine di scrittura: PENULTIMO (prima dell'abstract, dopo le conclusioni).
+% Lunghezza indicativa: ~10-12 pagine.
+% =====================================================================
+
+\chapter{Introduzione}
+\label{chap:introduzione}
+
+% =====================================================================
+\section{Il contesto: dall'entusiasmo per gli LLM al problema dell'adozione enterprise}
+\label{sec:contesto}
+% =====================================================================
+% TODO — Apertura "a imbuto":
+% - Diffusione degli LLM dal 2022 (rilascio pubblico ChatGPT) ad oggi.
+% - Adozione individuale veloce vs adozione enterprise lenta e complessa.
+% - Tre ostacoli concreti per le aziende medio-grandi:
+%     (i)   costo licenze SaaS per popolazione di decine di migliaia di utenti
+%     (ii)  sovranita' del dato (training/inference dove? di chi?)
+%     (iii) affidabilita' (allucinazioni, cfr. Xu et al., 2024)
+% - Riferimenti bibliografici primari: \cite{brown2020gpt3}, \cite{xu2024hallucination}.
+%
+% Riusare buona parte del testo da bozza-tesi.md, sezione 1.1.
+%
+% [FIGURA 1.1] Imbuto narrativo: contesto -> problema -> contributi.
+% Tipo: schema concettuale (TikZ o Excalidraw).
+% Posizione: chiusura della sezione 1.1 o apertura della 1.2.
+%
+% \begin{figure}[h]
+%     \centering
+%     \includegraphics[width=0.85\textwidth]{fig01_imbuto_narrativo.pdf}
+%     \caption[Imbuto narrativo della tesi]{Imbuto narrativo: dal contesto generale dell'adozione enterprise dell'AI generativa ai contributi specifici di questo lavoro.}
+%     \label{fig:imbuto_narrativo}
+% \end{figure}
+
+% =====================================================================
+\section{Tre modi di ancorare un LLM alla realta' aziendale}
+\label{sec:grounding-tre-modi}
+% =====================================================================
+% TODO — Introduzione del concetto di "grounding" come contromisura
+% all'allucinazione e come abilitatore dell'uso enterprise. Tre forme,
+% ciascuna in 1-2 paragrafi:
+%
+% 1. Web grounding (motore di ricerca + LLM, citazioni inline).
+%    -> esempio: Vera in Coop.
+%
+% 2. RAG - Retrieval-Augmented Generation \cite{lewis2020rag}.
+%    -> esempi: CooPolicy (corpus condiviso), Personal Docs (corpus per-utente).
+%
+% 3. Text-to-SQL: traduzione NL -> query strutturata.
+%    -> esempi: AllyCare/NPS, SysAid.
+%
+% Anticipare che la combinazione di queste tre tecniche ALL'INTERNO
+% di una stessa organizzazione e' la questione meno esplorata e
+% costituisce il cuore della tesi (insieme all'orchestrazione tra di esse).
+
+% =====================================================================
+\section{Il caso di studio: Coop Alleanza 3.0}
+\label{sec:caso-studio}
+% =====================================================================
+% TODO — Descrizione del contesto organizzativo:
+% - ~16.000 dipendenti, 400+ punti vendita, popolazione eterogenea.
+% - Stack IT esistente: GCP, Microsoft Entra ID, SysAid (ticketing).
+% - Scelta strategica della cooperativa: rinunciare al SaaS commerciale
+%   per costruire una piattaforma interna accessibile a tutti i dipendenti,
+%   con sovranita' del dato, modulare e estendibile.
+% - Domanda progettuale che ne deriva (formalizzata in chiusura di sezione):
+%   come si costruisce una piattaforma di AI generativa enterprise
+%   eterogenea, affidabile e sotto controllo?
+
+% =====================================================================
+\section{Contributo e approccio}
+\label{sec:contributi}
+% =====================================================================
+% TODO — La tesi sostiene che la risposta e' una SUITE di agenti LLM
+% verticali specializzati su domini distinti, COORDINATI da un
+% orchestratore intelligente che instrada dinamicamente le richieste.
+%
+% I contributi specifici della tesi sono TRE (in ordine di centralita'):
+%
+% 1. Progettazione e implementazione di una suite di agenti verticali
+%    su GCP (Vera, CooPolicy, AllyCare/NPS, SysAid). Capitoli 3-4.
+%
+% 2. Progettazione, implementazione e valutazione sperimentale di
+%    Orion, un orchestratore LLM-based che instrada le richieste sulla
+%    base di stima di intento, complessita' e confidenza, con meccanismo
+%    di clarification quando l'ambiguita' e' alta. Capitoli 5-6-7.
+%
+% 3. Un framework di valutazione iterativa del system prompt del router
+%    di Orion, basato su gold-standard, esecuzione automatica e metriche
+%    di accuracy + calibration. Capitolo 7.
+%
+% Citare \cite{wu2023autogen} per il pattern orchestratore-agenti
+% specializzati e \cite{ong2024routellm} per il filone routing.
+%
+% [FIGURA 1.2] Schema di sintesi dei contributi: layer agenti +
+% layer orchestratore + layer valutazione.
+% Tipo: schema concettuale.
+%
+% \begin{figure}[h]
+%     \centering
+%     \includegraphics[width=0.9\textwidth]{fig01_contributi.pdf}
+%     \caption[Sintesi visuale dei contributi della tesi]{Sintesi visuale dei tre contributi: suite di agenti verticali, orchestratore Orion, framework di valutazione.}
+%     \label{fig:contributi_sintesi}
+% \end{figure}
+
+% =====================================================================
+\section{Cosa questa tesi \emph{non} e'}
+\label{sec:non-e}
+% =====================================================================
+% TODO — Delimitare lo scope (consiglio di Bravetti):
+% - Non propone una nuova architettura di modello.
+% - Non propone un nuovo algoritmo di retrieval o di routing appreso
+%   (il routing in Orion e' LLM-based, non un modello addestrato).
+% - Non sostiene che l'architettura a agenti verticali + orchestratore
+%   sia universalmente la risposta giusta: mostra che lo e' in QUESTO
+%   contesto, alla luce dei vincoli della cooperativa partner.
+% - I modelli e i servizi cloud usati sono quelli oggi disponibili sul
+%   mercato; la novita' del lavoro sta nel modo in cui sono combinati e
+%   valutati su un dominio reale.
+
+% =====================================================================
+\section{Struttura della tesi}
+\label{sec:struttura}
+% =====================================================================
+% TODO — Mappa di navigazione, 1 paragrafo per capitolo. Da scrivere
+% PER ULTIMO una volta consolidata la struttura definitiva. Schema:
+%
+% Capitolo 2 - Background: concetti necessari (Transformer, LLM, prompt
+% engineering, grounding nelle tre forme, multi-agent, routing,
+% sicurezza, identity, infrastruttura cloud).
+%
+% Capitolo 3 - Architettura della suite di agenti: principi guida,
+% architettura d'insieme, e progettazione dei quattro agenti (Vera,
+% CooPolicy, AllyCare/NPS, SysAid).
+%
+% Capitolo 4 - Implementazione della suite: stack, monorepo, deploy,
+% e dettagli implementativi dei quattro agenti.
+%
+% Capitolo 5 - Architettura di Orion: orchestratore con routing LLM-based,
+% schema dell'output strutturato, gestione confidence, fallback.
+%
+% Capitolo 6 - Implementazione di Orion: backend, frontend, admin panel,
+% infrastruttura Terraform.
+%
+% Capitolo 7 - Valutazione di Orion: metodologia (test suite Coda,
+% endpoint /classify, script eval), metriche, risultati, calibration,
+% iterazione del system prompt.
+%
+% Capitolo 8 - Conclusioni e sviluppi futuri.

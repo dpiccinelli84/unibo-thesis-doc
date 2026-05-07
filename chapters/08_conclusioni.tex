@@ -1,0 +1,103 @@
+% =====================================================================
+% CAPITOLO 8 — CONCLUSIONI E SVILUPPI FUTURI
+% =====================================================================
+% Scopo (linee guida del prof): capitolo BREVE. Riassume i contributi
+% nel contesto del campo, evidenzia cio' che distingue il lavoro,
+% apre alle estensioni future.
+%
+% Ordine di scrittura: PENULTIMO (subito prima dell'introduzione),
+% perche' la conclusione tollera piu' dettagli tecnici dell'introduzione
+% e fa da palestra per scriverla.
+%
+% Lunghezza indicativa: 6-8 pagine.
+% =====================================================================
+
+\chapter{Conclusioni e sviluppi futuri}
+\label{chap:conclusioni}
+
+% =====================================================================
+\section{Sintesi dei contributi}
+\label{sec:concl-sintesi}
+% =====================================================================
+% TODO — Tre contributi, in ordine di centralita'. Ricalcare la stessa
+% struttura della sez. 1.4 ma con piu' dettagli tecnici (perche' il
+% lettore arriva qui DOPO aver letto i capitoli polpa).
+%
+% 1. Suite di agenti verticali (Cap. 3-4). Sintesi: cosa e' stato
+%    progettato e implementato per ciascuno dei quattro agenti, quali
+%    forme di grounding sono state adottate, in che modo si distingue
+%    rispetto a un sistema generalista monolitico.
+%
+% 2. Orchestratore Orion (Cap. 5-6). Sintesi: l'architettura LLM-based
+%    di routing, output strutturato, gestione di confidence e
+%    clarification, identita' federata propagata as-is, normalizzazione
+%    delle risposte.
+%
+% 3. Framework di valutazione iterativa del router (Cap. 7). Sintesi:
+%    il sistema di test su Coda + endpoint /classify + script di
+%    valutazione, le metriche scelte (con particolare enfasi sulla
+%    calibrazione del confidence score), le iterazioni prompt eseguite.
+%
+% Per ciascun contributo: posizionamento in letteratura
+% (\cite{wu2023autogen} per il pattern, \cite{ong2024routellm} per
+% il filone routing, \cite{liu2023agentbench} per la metodologia di
+% valutazione), e specifica di cio' che distingue il lavoro
+% (es. routing LLM-based con confidence calibration in contesto
+% enterprise reale italiano, dataset di valutazione su Coda).
+
+% =====================================================================
+\section{Generalizzabilita' del pattern}
+\label{sec:concl-generalizzabilita}
+% =====================================================================
+% TODO — Argomentare che l'architettura proposta non e' legata in modo
+% essenziale al dominio cooperativo. I pattern emersi sono riutilizzabili
+% in ogni organizzazione di dimensione medio-grande con:
+% - infrastruttura cloud consolidata,
+% - impossibilita' economica di licenze nominali diffuse,
+% - patrimonio informativo eterogeneo (documenti + dati strutturati + web),
+% - vincoli di compliance.
+
+% =====================================================================
+\section{Sviluppi futuri}
+\label{sec:concl-futuri}
+% =====================================================================
+
+\subsection{Da router LLM-based a router appreso (RouteLLM)}
+\label{subsec:concl-routellm}
+% TODO — Direzione 1: passare dal router LLM-based attuale a un router
+% appreso \cite{ong2024routellm} addestrato su dati di preferenza
+% raccolti dal traffico reale. Implicazioni: dataset, MLOps, costo di
+% inferenza ridotto a fronte di costo di training.
+
+\subsection{Estensione della suite a nuovi domini verticali}
+\label{subsec:concl-policy-agent}
+% TODO — Direzione 2: aggiungere nuovi agenti specializzati alla suite
+% gestita da Orion. In primo piano: Policy Agent (ricerca su intranet
+% Magnolia + SharePoint), oggi bloccato da questioni di service account
+% senza MFA. Domini analoghi (HR, contratti, formazione) seguiranno
+% lo stesso pattern.
+
+\subsection{Self-consistency e confidence ensemble}
+\label{subsec:concl-self-consistency}
+% TODO — Direzione 3: investigare l'uso di Self-Consistency
+% \cite{wang2022selfconsistency} come stima di confidenza piu' robusta
+% (N call indipendenti -> voto). Trade-off costo: gestibile se
+% applicato solo ai casi sotto la soglia di clarification.
+
+\subsection{Valutazione su traffico reale}
+\label{subsec:concl-valutazione-reale}
+% TODO — Direzione 4: estendere l'impianto di valutazione dal dataset
+% sintetico Coda al traffico reale degli utenti, con review umana
+% periodica. Citare \cite{liu2023agentbench} per il framework di
+% riferimento.
+
+% =====================================================================
+\section{Considerazione finale}
+\label{sec:concl-finale}
+% =====================================================================
+% TODO — 1-2 paragrafi conclusivi. Reframe: l'adozione enterprise
+% dell'AI generativa non e' la scelta tra "comprare una licenza" e
+% "non adottarla", ma un problema di ARCHITETTURA dei sistemi
+% informativi a tutti gli effetti. Posto in questi termini, ammette
+% risposte ingegnerizzate sostenibili economicamente e difendibili
+% rispetto ai vincoli di sovranita' e compliance.

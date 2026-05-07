@@ -1,4 +1,4 @@
-# LaTeX build artifacts
+# LaTeX build artifacts (auxiliary files - regenerated on each build)
 *.aux
 *.bbl
 *.bcf
@@ -9,7 +9,6 @@
 *.log
 *.lot
 *.out
-*.pdf
 *.run.xml
 *.synctex.gz
 *.toc
@@ -17,5 +16,19 @@
 *.snm
 *.vrb
 
-# Zip sorgente
+# PDF di output del documento principale (rigenerato da latexmk)
+/main.pdf
+
+# I PDF di guida UniBO e il frontespizio compilato vengono invece
+# committati (sono materiale di riferimento, non build artifacts).
+# Vedi: guide-unibo-scrittura-tesi/
+
+# Zip sorgente del frontespizio (i file estratti sono gia' presenti)
 frontespizio_unibo.zip
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.idea/

@@ -1,7 +1,7 @@
 % =====================================================================
 % CAPITOLO 3 — ARCHITETTURA DELLA SUITE DI AGENTI
 % =====================================================================
-% POLPA, parte A1. Scopo: decisioni progettuali e motivazioni.
+% Parte A1 della "polpa". Scopo: decisioni progettuali e motivazioni.
 % Il "come" tecnico è nel Cap. 4.
 % =====================================================================
 
@@ -10,16 +10,10 @@
 \chapter{La suite di agenti: architettura}
 \label{chap:agenti-architettura}
 
-Il presente capitolo descrive le decisioni architetturali alla base
-dei quattro agenti che compongono la suite di intelligenza artificiale
-generativa sviluppata per Coop Alleanza~3.0. Per ciascun agente vengono
-illustrati il caso d'uso, la scelta del paradigma di grounding e le
-motivazioni delle principali scelte progettuali. La distinzione tra
-\emph{architettura} e \emph{implementazione} è deliberata: separare
-le decisioni di design --- il \emph{cosa} e il \emph{perché} --- dai
-dettagli tecnici --- il \emph{come} --- facilita la comprensione, la
-manutenzione e l'evoluzione del sistema nel tempo. I dettagli
-implementativi sono pertanto rimandati al
+Questo capitolo si concentra sulla prima fase del progetto, descrivendo le scelte architetturali compiute, e i vincoli e requisiti che le hanno condizionate.
+In particolare sono descritte le architetture dei singoli agenti verticali, dei sistemi che li ospitano (e che ospiteranno anche l'orchestratore) e dei 
+flussi di rilascio e gestione del ciclo di vita del software; 
+i dettagli implementativi sono invece riportati nel capitolo 
 % \ref{} inserisce il numero del capitolo/sezione corrispondente all'etichetta.
 Capitolo~\ref{chap:agenti-implementazione}.
 
@@ -31,24 +25,21 @@ Capitolo~\ref{chap:agenti-implementazione}.
 \subsection{Principi guida}
 \label{subsec:agenti-principi-guida}
 
-La progettazione della suite è stata guidata da tre principi fondamentali,
-stabiliti prima di avviare lo sviluppo e mantenuti come vincoli inalterabili
-durante tutte le fasi successive.
+La progettazione è stata guidata da tre principi fondamentali,
+stabiliti prima di avviare lo sviluppo e mantenuti come requisiti inalterabili durante tutte le fasi successive.
 
 % \begin{description} è una lista in cui ogni voce ha un'etichetta in grassetto.
 % Utile per elenchi di principi, definizioni, caratteristiche.
 \begin{description}
   \item[Modularità verticale.]
-  Ogni dominio informativo è affidato a un agente autonomo e indipendente,
+  Ogni dominio informativo o funzionale è affidato a un agente autonomo e indipendente,
   con il proprio meccanismo di grounding, il proprio ciclo di vita
-  applicativo e la propria infrastruttura di deployment. Un agente
-  specializzato su un dominio ristretto --- la policy aziendale, i dati
-  dei sondaggi NPS, il sistema di ticketing --- produce risposte più
-  accurate di un agente generalista con un sistema prompt troppo ampio
-  per essere preciso su ogni sottodominio. La separazione strutturale
+  applicativo e la propria infrastruttura di deployment: in questo modo è possibile effettuare "fine-tuning / few shot learning" ad hoc per il singolo caso d'uso.
+  Essendo questa la modalità principale di fruizione degli agenti LLM disponibili, la puntualità e precisione delle configurazioni
+  può impattare considerevolmente le performance.
+  La separazione a livello sistemistico
   consente inoltre di aggiornare, monitorare e scalare ogni servizio
-  in modo indipendente, senza che un malfunzionamento su un agente si
-  propaghi agli altri.
+  in modo indipendente.
 
   \item[Sovranità del dato.]
   Nessun dato utente lascia il perimetro cloud europeo --- specificatamente

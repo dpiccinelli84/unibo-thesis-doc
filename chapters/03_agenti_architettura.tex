@@ -1,5 +1,5 @@
 % =====================================================================
-% CAPITOLO 3 — ARCHITETTURA DELLA SUITE DI AGENTI
+% CAPITOLO 3 — ARCHITETTURA DEL PORTALE E DEGLI AGENTI VERTICALI
 % =====================================================================
 % Parte A1 della "polpa". Scopo: decisioni progettuali e motivazioni.
 % Il "come" tecnico è nel Cap. 4.
@@ -31,66 +31,44 @@ stabiliti prima di avviare lo sviluppo e mantenuti come requisiti inalterabili d
 % \begin{description} è una lista in cui ogni voce ha un'etichetta in grassetto.
 % Utile per elenchi di principi, definizioni, caratteristiche.
 \begin{description}
-  \item[Modularità verticale.]
+
+  \item[Rispetto dei principi etici e cooperativi]
+  Gli agenti LLM sono intrinsecamente esposti a bias,
+  alle allucinazioni e alla diffuzione di disinformazione. E' imperativo per una cooperativa come Coop Alleanza 3.0 
+  prevenire attivamente questi rischi e mitigarne gli effetti negativi sugli utenti, procedendo inoltre, anche nell'utilizzo di questi strumenti, nel pieno rispetto dei principi etici e cooperativi che sono alla base della cooperativa.
+  Mettendo a disposizione degli utenti un pacchetto di assistenti per le loro necessità, si può prevenire l'utilizzo da parte loro di strumenti AI esterni pubblici e non autorizzati.
+  Oltre alla riduzione degli evidenti rischi per la sicurezza del dato (punto successivo), gli strumenti a sviluppo interno possono essere "istruiti" secondo dei "prompt di sistema" stabiliti collegialmente fra i vari uffici interni, facendo sì
+  che le risposte prodotte siano conformi ai valori cooperativi ed etici che animano la cooperativa, mantenendo inoltre la possibilità di modifiche in corso d'opera e cicli di aggiornamento rapidi e controllati.  
+
+  \item[Sovranità del dato]
+  Nessun dato utente lascia il perimetro cloud europeo: per una cooperativa con oltre 16.000 dipendenti che tratta dati sensibili di natura HR, sondaggi
+  interni e ticket di assistenza tecnica, la conformità al Regolamento Generale sulla Protezione dei Dati (GDPR) non è un requisito negoziabile.
+  Questo principio ha determinato la scelta di Vertex AI come piattaforma di inferenza principale (modelli Gemini ospitati in data center europei),
+  l'adozione di Cloud Data Loss Prevention (DLP) per la sanitizzazione automatica dei prompt.
+  Inoltre, nessun dato lascia i sistemi di Coop Alleanza: la realizzazione completamente interna dei sistemi di backend, database e frontend consente un elevato livello di controllo e sicurezza.
+
+  \item[Modularità verticale]
   Ogni dominio informativo o funzionale è affidato a un agente autonomo e indipendente,
-  con il proprio meccanismo di grounding, il proprio ciclo di vita
-  applicativo e la propria infrastruttura di deployment: in questo modo è possibile effettuare "fine-tuning / few shot learning" ad hoc per il singolo caso d'uso.
-  Essendo questa la modalità principale di fruizione degli agenti LLM disponibili, la puntualità e precisione delle configurazioni
-  può impattare considerevolmente le performance.
-  La separazione a livello sistemistico
-  consente inoltre di aggiornare, monitorare e scalare ogni servizio
-  in modo indipendente.
+  con il proprio meccanismo di grounding, il proprio ciclo di vita applicativo e la propria infrastruttura di deployment: in questo modo è possibile effettuare "fine-tuning / few shot learning" ad hoc per il singolo caso d'uso.
+  Essendo questa la modalità principale di fruizione degli agenti LLM disponibili, la puntualità e precisione delle configurazioni può impattare considerevolmente le performance.
+  La separazione a livello sistemistico consente inoltre di aggiornare, monitorare e scalare ogni servizio in modo indipendente.
 
-  \item[Sovranità del dato.]
-  Nessun dato utente lascia il perimetro cloud europeo --- specificatamente
-  la region GCP \texttt{europe-west8} --- se non in contesti sperimentali
-  esplicitamente controllati e documentati. Per una cooperativa con oltre
-  16.000 dipendenti che tratta dati sensibili di natura HR, sondaggi
-  interni e ticket di assistenza tecnica, la conformità al Regolamento
-  Generale sulla Protezione dei Dati (GDPR) non è un requisito negoziabile.
-  Questo principio ha determinato la scelta di Vertex AI come piattaforma
-  di inferenza principale (modelli Gemini ospitati in data center europei),
-  l'adozione di Cloud Data Loss Prevention (DLP) per la sanitizzazione
-  automatica dei prompt, e ha limitato l'integrazione con Claude di
-  Anthropic al solo contesto del confronto sperimentale controllato
-  descritto nella Sezione~\ref{sec:agenti-sysaid-arch}.
+  \item[Automazione dei rilasci]
+  Le evolutive devono potere essere rilasciate in maniera trasparente verso l'utente, automatizzata per ridurre al minimo la possibilità di errore umano, e con uno step approvativo per il passaggio in produzione
 
-  \item[Trasparenza al lettore.]
-  Ogni risposta prodotta da un agente di grounding è accompagnata da
-  riferimenti espliciti alle fonti sulle quali si basa. Il principio
-  persegue un duplice obiettivo: ridurre il rischio di allucinazioni
-  \emph{percepite} dall'utente come accettabili --- poiché una risposta
-  priva di fonte è più difficile da contestare --- e costruire un
-  rapporto di fiducia con una popolazione di utenti eterogenea, non
-  necessariamente familiare con i limiti strutturali dei sistemi di
-  intelligenza artificiale generativa, tra i quali l'allucinazione
-  rappresenta uno dei più insidiosi~\cite{xu2024hallucination}.
+
 \end{description}
 
 % \cite{chiave} inserisce la citazione bibliografica corrispondente.
 % La ~ prima di \cite è uno spazio non separabile (evita che la citazione
 % vada a capo separata dalla parola precedente).
-Questi tre principi non operano in maniera indipendente: la modularità
-verticale crea il presupposto per cui la sovranità del dato è più
-facile da garantire (ogni agente ha una superficie di rischio ben
-definita) e la trasparenza al lettore è più semplice da implementare
-(un agente specializzato sa esattamente quali fonti ha consultato).
-I tre principi costituiscono inoltre una premessa esplicita per
-comprendere alcune scelte dell'orchestratore Orion, in particolare
-la decisione di propagare il token di identità dell'utente ai
-sub-agenti \emph{as-is}, anziché sostituirlo con un service account
-dedicato (cfr.\ Sezione~\ref{sec:orion-acl}).
 
 \subsection{Architettura d'insieme}
 \label{subsec:agenti-architettura-insieme}
 
-La suite è strutturata come un insieme di microservizi indipendenti.
-Ogni agente è composto da un backend FastAPI e un frontend React,
-deployati ciascuno come servizio separato su Google Cloud Run.
-Il punto di ingresso per l'utente finale è un'applicazione portal
-(Single Page Application React) che gestisce l'autenticazione e
-presenta un'interfaccia unificata con i collegamenti agli agenti
-disponibili in funzione del badge dell'utente autenticato.
+L'ecosistema di agenti è strutturato con un portale unico di accesso.
+Questo rende più intuitivo l'accesso: l'URL di riferimento è uno soltanto, inoltre è la logica conseguenza della modularità verticale che abbiamo scelto di perseguire:
+nuovi agenti possono semplicemente essere inseriti nel "framework", andando a configurare solo la gestione dell'accesso tramite configurazione dell'utenza di dominio associata all'utente.
 
 % \begin{itemize} è la lista puntata standard.
 % \textbf{} produce testo in grassetto.

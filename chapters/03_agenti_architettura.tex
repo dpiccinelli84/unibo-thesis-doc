@@ -1,19 +1,20 @@
 % =====================================================================
 % CAPITOLO 3 — ARCHITETTURA DEL PORTALE E DEGLI AGENTI VERTICALI
 % =====================================================================
-% Parte A1 della "polpa". Scopo: decisioni progettuali e motivazioni.
+% Parte A1 della "polpa". Scopo: decisioni progettuali di altro livello e motivazioni.
 % Il "come" tecnico è nel Cap. 4.
 % =====================================================================
 
 % \chapter{} apre un nuovo capitolo numerato e aggiunge la voce al ToC.
 % \label{} associa un'etichetta che altri comandi \ref{} possono citare.
+
 \chapter{La suite di agenti: architettura}
 \label{chap:agenti-architettura}
 
 Questo capitolo si concentra sulla prima fase del progetto, descrivendo le scelte architetturali compiute, e i vincoli e requisiti che le hanno condizionate.
-In particolare sono descritte le architetture dei singoli agenti verticali, dei sistemi che li ospitano (e che ospiteranno anche l'orchestratore) e dei 
-flussi di rilascio e gestione del ciclo di vita del software; 
-i dettagli implementativi sono invece riportati nel capitolo 
+In particolare sono descritte ad alto livello le architetture dei singoli agenti verticali, dei sistemi che li ospitano (e che ospiteranno anche l'orchestratore) e dei
+flussi di rilascio e gestione del ciclo di vita del software;
+i dettagli implementativi sono invece riportati nel capitolo
 % \ref{} inserisce il numero del capitolo/sezione corrispondente all'etichetta.
 Capitolo~\ref{chap:agenti-implementazione}.
 
@@ -25,36 +26,49 @@ Capitolo~\ref{chap:agenti-implementazione}.
 \subsection{Principi guida}
 \label{subsec:agenti-principi-guida}
 
-La progettazione è stata guidata da tre principi fondamentali,
-stabiliti prima di avviare lo sviluppo e mantenuti come requisiti inalterabili durante tutte le fasi successive.
+La progettazione è stata guidata da una serie di principi fondamentali trasversali,
+stabiliti prima di avviare lo sviluppo e mantenuti durante tutte le fasi successive.
 
 % \begin{description} è una lista in cui ogni voce ha un'etichetta in grassetto.
 % Utile per elenchi di principi, definizioni, caratteristiche.
 \begin{description}
 
   \item[Rispetto dei principi etici e cooperativi]
-  Gli agenti LLM sono intrinsecamente esposti a bias,
-  alle allucinazioni e alla diffuzione di disinformazione. E' imperativo per una cooperativa come Coop Alleanza 3.0 
-  prevenire attivamente questi rischi e mitigarne gli effetti negativi sugli utenti, procedendo inoltre, anche nell'utilizzo di questi strumenti, nel pieno rispetto dei principi etici e cooperativi che sono alla base della cooperativa.
-  Mettendo a disposizione degli utenti un pacchetto di assistenti per le loro necessità, si può prevenire l'utilizzo da parte loro di strumenti AI esterni pubblici e non autorizzati.
-  Oltre alla riduzione degli evidenti rischi per la sicurezza del dato (punto successivo), gli strumenti a sviluppo interno possono essere "istruiti" secondo dei "prompt di sistema" stabiliti collegialmente fra i vari uffici interni, facendo sì
-  che le risposte prodotte siano conformi ai valori cooperativi ed etici che animano la cooperativa, mantenendo inoltre la possibilità di modifiche in corso d'opera e cicli di aggiornamento rapidi e controllati.  
+    Gli agenti LLM sono intrinsecamente portati a esprimere bias,
+    alle allucinazioni e alla diffusione di disinformazione. È imperativo per una cooperativa come Coop Alleanza 3.0
+    prevenire attivamente questi rischi e mitigarne gli effetti negativi sugli utenti, procedendo inoltre, anche nell'utilizzo di questi strumenti, nel pieno rispetto dei principi etici e cooperativi che sono alla base della cooperativa.
+    Mettendo a disposizione degli utenti un pacchetto di assistenti per le loro necessità, si può prevenire l'utilizzo da parte loro di strumenti AI esterni pubblici e non autorizzati (fenomeno chiamato "Shadow AI").
+    Oltre alla riduzione degli evidenti rischi per la sicurezza del dato, gli strumenti a sviluppo interno possono essere "istruiti" secondo dei "prompt di sistema" stabiliti collegialmente fra i vari uffici interni, facendo sì
+    che le risposte prodotte siano conformi ai valori cooperativi ed etici che animano la cooperativa, mantenendo inoltre la possibilità di modifiche in corso d'opera e cicli di aggiornamento rapidi e controllati.
+
+  \item[Governance facilitata]
+    Gli agenti devono implementare soluzioni adeguate a prevenire utilizzi impropri e fughe di dati personali.
+    Le configurazioni relative al prompt di sistema (la "personalità" dell'agente) e del grado di controllo su utilizzi impropri e dati personali devono essere visualizzabili e impostabili da una dashboard apposita,
+    che consenta agli uffici preposti (che non hanno competenza tecnica stretta) di controllare questi parametri
+
+  \item[Implementazione agnostica e sostenibile]
+    Nella realtà aziendale attuale, molti fornitori propongono i propri modelli di assistenti o agenti AI.
+    Spesso questo comporta il rischio di una dipendenza (vendor lock-in) più o meno rilevante: ad esempio, le soluzioni "out of the box" risultano di difficile trasposizione verso realtà
+    diverse da quelle del fornitore. Inoltre spesso sono richiesti piani di abbonamento o sottoscrizioni che possono comportare costi fissi anche in caso di effettivo inutilizzo dello strumento.
+    La soluzione proposta si prefigge di essere completamente portabile e facilmente adattabile verso qualunque architettura cloud o on-premises, e inoltre vuole attuare un controllo attivo dei costi, stanziando
+    periodicamente un budget di utilizzo definito dagli amministratori ("token") per ogni utente, così da garantire la sostenibilità del progetto.
 
   \item[Sovranità del dato]
-  Nessun dato utente lascia il perimetro cloud europeo: per una cooperativa con oltre 16.000 dipendenti che tratta dati sensibili di natura HR, sondaggi
-  interni e ticket di assistenza tecnica, la conformità al Regolamento Generale sulla Protezione dei Dati (GDPR) non è un requisito negoziabile.
-  Questo principio ha determinato la scelta di Vertex AI come piattaforma di inferenza principale (modelli Gemini ospitati in data center europei),
-  l'adozione di Cloud Data Loss Prevention (DLP) per la sanitizzazione automatica dei prompt.
-  Inoltre, nessun dato lascia i sistemi di Coop Alleanza: la realizzazione completamente interna dei sistemi di backend, database e frontend consente un elevato livello di controllo e sicurezza.
+    Nessun dato deve lasciare il perimetro cloud europeo, in conformità al Regolamento Generale sulla Protezione dei Dati (GDPR)
 
   \item[Modularità verticale]
-  Ogni dominio informativo o funzionale è affidato a un agente autonomo e indipendente,
-  con il proprio meccanismo di grounding, il proprio ciclo di vita applicativo e la propria infrastruttura di deployment: in questo modo è possibile effettuare "fine-tuning / few shot learning" ad hoc per il singolo caso d'uso.
-  Essendo questa la modalità principale di fruizione degli agenti LLM disponibili, la puntualità e precisione delle configurazioni può impattare considerevolmente le performance.
-  La separazione a livello sistemistico consente inoltre di aggiornare, monitorare e scalare ogni servizio in modo indipendente.
+    Ogni dominio informativo o funzionale è affidato a un agente autonomo e indipendente,
+    con il proprio meccanismo di grounding, il proprio ciclo di vita applicativo e la propria infrastruttura di deployment: in questo modo è possibile effettuare "fine-tuning / few shot learning" ad hoc per il singolo caso d'uso.
+    Essendo questa la modalità principale di fruizione degli agenti LLM disponibili, la puntualità e precisione delle configurazioni può impattare considerevolmente le performance.
+    La separazione a livello sistemistico consente inoltre di aggiornare, monitorare e scalare ogni servizio in modo indipendente.
 
   \item[Automazione dei rilasci]
-  Le evolutive devono potere essere rilasciate in maniera trasparente verso l'utente, automatizzata per ridurre al minimo la possibilità di errore umano, e con uno step approvativo per il passaggio in produzione
+    Le evolutive devono potere essere rilasciate in maniera trasparente verso l'utente, automatizzata per ridurre al minimo la possibilità di errore umano, e con uno step approvativo per il passaggio in produzione;
+    Tutto il codice sorgente deve essere presente e aggiornato nel repository Git usato dalla Cooperativa (Atlassian BitBu)
+
+  \item[Accesso privato e con controllo centralizzato]
+    L'intero ecosistema deve potere essere accessibile solo da rete interna di Coop Alleanza, o da VPN: l'infrastruttura utilizzata deve quindi evitare l'esposizione su rete pubblica.
+    Il controllo dell'abilitazione degli utenti all'uso degli assistenti deve integrarsi con il sistema di Identity Management Microsoft EntraID già esistente in Cooperativa
 
 
 \end{description}
@@ -66,25 +80,27 @@ stabiliti prima di avviare lo sviluppo e mantenuti come requisiti inalterabili d
 \subsection{Architettura d'insieme}
 \label{subsec:agenti-architettura-insieme}
 
-L'ecosistema di agenti è strutturato con un portale unico di accesso.
-Questo rende più intuitivo l'accesso: l'URL di riferimento è uno soltanto, inoltre è la logica conseguenza della modularità verticale che abbiamo scelto di perseguire:
-nuovi agenti possono semplicemente essere inseriti nel "framework", andando a configurare solo la gestione dell'accesso tramite configurazione dell'utenza di dominio associata all'utente.
+L'ecosistema di agenti è accessibile da un unico "portale", così che l'utente possa abituarsi all'utilizzo di un unico indirizzo di accesso: è la logica conseguenza della modularità verticale descritta.
+I nuovi agenti possono semplicemente essere inseriti nel "framework", andando eventualmente a impostare granularmente quali agenti sono "visibili" tramite i parametri dell'utenza di dominio associata all'utente.
+Lo stesso approccio deve valere per le dashboard di configurazione (gli "admin panel")
+La configurazione iniziale non prevede la presenza di un agente orchestratore che sia interfaccia "unica" per l'utente per la fruizione di tutti gli agenti;
+l'utente deve selezionare l'agente che desidera utilizzare volta per volta.
 
 % \begin{itemize} è la lista puntata standard.
 % \textbf{} produce testo in grassetto.
 L'infrastruttura condivisa comprende:
 \begin{itemize}
   \item \textbf{Cloud SQL PostgreSQL~16}: persistenza delle conversazioni,
-    gestione degli utenti e dei profili di quota, audit log e
-    configurazioni applicative. Ogni agente accede al proprio schema
-    di database dedicato sulla stessa istanza Cloud SQL.
+        gestione degli utenti e dei profili di quota, audit log e
+        configurazioni applicative. Ogni agente accede al proprio schema
+        di database dedicato sulla stessa istanza Cloud SQL.
   \item \textbf{BigQuery}: sorgente di dati strutturati per gli agenti
-    Text-to-SQL. Contiene le tabelle dei sondaggi NPS (AllyCare) e
-    dei ticket del sistema di assistenza SysAid, aggiornate con cadenza
-    periodica tramite pipeline di integrazione dati.
+        Text-to-SQL. Contiene le tabelle dei sondaggi NPS (AllyCare) e
+        dei ticket del sistema di assistenza SysAid, aggiornate con cadenza
+        periodica tramite pipeline di integrazione dati.
   \item \textbf{Vertex AI}: piattaforma di inferenza per i modelli Gemini
-    (2.5~Flash e 2.5~Pro), per il Web grounding tramite Google Search
-    e per il RAG Engine utilizzato da CooPolicy.
+        (2.5~Flash e 2.5~Pro), per il Web grounding tramite Google Search
+        e per il RAG Engine utilizzato da CooPolicy.
 \end{itemize}
 
 Un aspetto caratterizzante di questa architettura nella sua versione
@@ -108,53 +124,21 @@ e~\ref{chap:orion-implementazione}.
 % del diagramma è disponibile in img/, basterà sostituire il blocco
 % \fbox...\parbox con \includegraphics[width=\textwidth]{fig03_architettura_suite.pdf}
 \begin{figure}[htbp]
-    \centering
-    \fbox{\parbox{0.88\textwidth}{\centering\vspace{2.5cm}
-        \textit{[Diagramma architetturale --- da inserire]}\\[0.5em]
-        \small Portal $\rightarrow$ Entra ID $\rightarrow$ Badge
-        $\rightarrow$ Agenti Cloud Run\\
-        (Vera, CooPolicy, AllyCare, SysAid)\\[0.3em]
-        Infrastruttura condivisa: Vertex AI, BigQuery, Cloud SQL
-        \vspace{2.5cm}}}
-    \caption[Architettura d'insieme della suite di agenti]{Architettura
+  \centering
+  \fbox{\parbox{0.88\textwidth}{\centering\vspace{2.5cm}
+      \textit{[Diagramma architetturale --- da inserire]}\\[0.5em]
+      \small Portal $\rightarrow$ Entra ID $\rightarrow$ Badge
+      $\rightarrow$ Agenti Cloud Run\\
+      (Vera, CooPolicy, AllyCare, SysAid)\\[0.3em]
+      Infrastruttura condivisa: Vertex AI, BigQuery, Cloud SQL
+      \vspace{2.5cm}}}
+  \caption[Architettura d'insieme della suite di agenti]{Architettura
     della suite di agenti verticali di Coop Alleanza~3.0: portal con
     autenticazione federata Entra ID, quattro servizi Cloud Run
     indipendenti e infrastruttura condivisa Vertex~AI, BigQuery e
     Cloud~SQL~PostgreSQL~16.}
-    \label{fig:architettura_suite}
+  \label{fig:architettura_suite}
 \end{figure}
-
-\subsection{Portal e autenticazione federata Entra ID}
-\label{subsec:agenti-portal-auth}
-
-L'autenticazione è centralizzata nel portal e delegata a Microsoft
-Entra ID~\cite{msft_entra_id} tramite la libreria
-MSAL~\cite{msft_msal}. Il protocollo adottato è OAuth~2.0
-Authorization Code Flow con PKCE~\cite{rfc6749oauth2}, completato da
-un layer OpenID Connect~\cite{oidc1_0core} che consente al portal di
-ricevere, insieme al token di accesso, le informazioni sull'identità
-dell'utente autenticato, in particolare l'elenco dei gruppi Entra ID
-di appartenenza.
-
-I gruppi vengono mappati, in fase di accesso, a un \emph{badge}
-applicativo scelto tra quattro livelli gerarchici: \texttt{Bronze},
-\texttt{Silver}, \texttt{Gold} e \texttt{Admin}. Il badge determina
-quali agenti sono visibili nell'interfaccia del portal e quali
-funzionalità sono accessibili all'interno di ciascun agente. Un
-dipendente con badge \texttt{Bronze}, ad esempio, ha accesso a Vera
-e AllyCare ma non a CooPolicy, il cui corpus di documenti è riservato
-a gruppi autorizzati dalla cooperativa
-(cfr.\ Sezione~\ref{sec:agenti-coopolicy-arch}).
-
-Il token JWT~\cite{rfc7519jwt} viene conservato nello
-\texttt{sessionStorage} del browser e propagato, tramite l'header
-HTTP \texttt{Authorization: Bearer <token>}, a ogni richiesta verso
-i backend degli agenti. Ogni backend verifica autonomamente la firma
-del token tramite le chiavi pubbliche di Entra ID e ne estrae le
-\emph{claims} necessarie --- username, gruppi, badge --- senza
-dipendere da un servizio centralizzato di autorizzazione. Questa
-architettura mantiene ogni agente autonomo e deployabile
-indipendentemente, in linea con il principio di modularità verticale.
 
 % La figura è commentata: sarà scommentata quando il diagramma è pronto.
 % Notare la sintassi: % all'inizio della riga commenta l'intera riga.
@@ -232,37 +216,37 @@ Il flusso di una richiesta a Vera si articola nelle seguenti fasi:
 % \begin{enumerate} produce una lista numerata.
 \begin{enumerate}
   \item \textbf{Sanitizzazione DLP}: prima che il prompt raggiunga il
-    modello, Cloud Data Loss Prevention analizza il testo alla ricerca
-    di PII (Personally Identifiable Information) secondo un insieme di
-    info-type configurati per il contesto italiano (codice fiscale,
-    partita IVA, numero di conto corrente, IBAN). I dati sensibili
-    rilevati vengono sostituiti con token anonimi prima dell'invio
-    al modello.
+        modello, Cloud Data Loss Prevention analizza il testo alla ricerca
+        di PII (Personally Identifiable Information) secondo un insieme di
+        info-type configurati per il contesto italiano (codice fiscale,
+        partita IVA, numero di conto corrente, IBAN). I dati sensibili
+        rilevati vengono sostituiti con token anonimi prima dell'invio
+        al modello.
 
   \item \textbf{Selezione del modello}: un router euristico interno
-    classifica la complessità stimata della richiesta e seleziona tra
-    Gemini~2.5~Flash (richieste semplici, bassa latenza, costo ridotto)
-    e Gemini~2.5~Pro (richieste articolate che richiedono maggiore
-    capacità di ragionamento). Questo meccanismo anticipa, a livello
-    di singolo agente, il concetto di routing che Orion porta a livello
-    di suite.
+        classifica la complessità stimata della richiesta e seleziona tra
+        Gemini~2.5~Flash (richieste semplici, bassa latenza, costo ridotto)
+        e Gemini~2.5~Pro (richieste articolate che richiedono maggiore
+        capacità di ragionamento). Questo meccanismo anticipa, a livello
+        di singolo agente, il concetto di routing che Orion porta a livello
+        di suite.
 
   \item \textbf{Generazione con Web grounding}: il modello selezionato
-    riceve il prompt con il tool Google Search abilitato. Quando lo
-    ritiene necessario, il modello emette chiamate al tool di ricerca,
-    riceve i risultati e li integra nella generazione della risposta.
-    Le fonti consultate vengono incluse come citazioni inline con URL
-    e titolo del documento.
+        riceve il prompt con il tool Google Search abilitato. Quando lo
+        ritiene necessario, il modello emette chiamate al tool di ricerca,
+        riceve i risultati e li integra nella generazione della risposta.
+        Le fonti consultate vengono incluse come citazioni inline con URL
+        e titolo del documento.
 
   \item \textbf{Streaming SSE}: la risposta viene restituita al
-    frontend tramite Server-Sent Events (SSE), consentendo la
-    visualizzazione progressiva del testo non appena viene prodotto,
-    riducendo la latenza percepita dall'utente.
+        frontend tramite Server-Sent Events (SSE), consentendo la
+        visualizzazione progressiva del testo non appena viene prodotto,
+        riducendo la latenza percepita dall'utente.
 
   \item \textbf{Quota accounting}: al termine della generazione, il
-    backend aggiorna il contatore di utilizzo dell'utente nel database
-    PostgreSQL, in funzione del modello utilizzato e del volume di
-    token consumati.
+        backend aggiorna il contatore di utilizzo dell'utente nel database
+        PostgreSQL, in funzione del modello utilizzato e del volume di
+        token consumati.
 \end{enumerate}
 
 %
@@ -330,7 +314,7 @@ I risultati del retrieval sono accompagnati da un punteggio di
 similarità. Se nessun documento del corpus supera la soglia configurata,
 CooPolicy risponde con un messaggio standardizzato
 (\emph{``Non trovo informazioni su questo argomento nei documenti
-disponibili''}) anziché tentare una risposta. Questa scelta riflette
+  disponibili''}) anziché tentare una risposta. Questa scelta riflette
 un principio fondamentale per i sistemi RAG in ambito aziendale: è
 preferibile ammettere l'assenza di informazione piuttosto che allucinare
 contenuti presentati come policy ufficiali.
@@ -416,23 +400,23 @@ risposta. Tre tool sono disponibili al modello:
 
 \begin{description}
   \item[\texttt{run\_sql(query)}]
-  Esegue la query SQL su BigQuery e restituisce il result set. Il
-  modello può invocare questo tool più volte in sequenza, ad esempio
-  per interrogare tabelle diverse o per raffinare una query sulla
-  base dei risultati intermedi.
+    Esegue la query SQL su BigQuery e restituisce il result set. Il
+    modello può invocare questo tool più volte in sequenza, ad esempio
+    per interrogare tabelle diverse o per raffinare una query sulla
+    base dei risultati intermedi.
 
   \item[\texttt{analyze\_comments(text)}]
-  Esegue un'analisi semantica sui commenti testuali liberi estratti
-  da una query precedente: identificazione dei temi ricorrenti,
-  sentiment prevalente, citazioni rappresentative. Gestisce la
-  dimensione qualitativa dell'analisi che sfugge alle sole
-  aggregazioni numeriche.
+    Esegue un'analisi semantica sui commenti testuali liberi estratti
+    da una query precedente: identificazione dei temi ricorrenti,
+    sentiment prevalente, citazioni rappresentative. Gestisce la
+    dimensione qualitativa dell'analisi che sfugge alle sole
+    aggregazioni numeriche.
 
   \item[\texttt{generate\_chart(data, chart\_type)}]
-  Genera una visualizzazione grafica (istogramma, serie temporale,
-  grafico a dispersione) a partire dai dati numerici estratti,
-  restituita come immagine base64 da renderizzare embedded nella
-  risposta al frontend.
+    Genera una visualizzazione grafica (istogramma, serie temporale,
+    grafico a dispersione) a partire dai dati numerici estratti,
+    restituita come immagine base64 da renderizzare embedded nella
+    risposta al frontend.
 \end{description}
 
 Il loop si conclude quando il modello ritiene di aver raccolto tutte
@@ -492,11 +476,11 @@ e simultanee:
 
 \begin{itemize}
   \item \textbf{Variante Gemini}: backend FastAPI con Gemini~2.5~Flash
-    e Gemini~2.5~Pro tramite Vertex AI, seguendo il medesimo pattern
-    architetturale di AllyCare.
+        e Gemini~2.5~Pro tramite Vertex AI, seguendo il medesimo pattern
+        architetturale di AllyCare.
   \item \textbf{Variante Sonnet}: backend FastAPI con Claude
-    Sonnet~4.6 tramite Anthropic SDK~\cite{anthropic_docs}, con un
-    thin adapter che normalizza il diverso protocollo di tool use.
+        Sonnet~4.6 tramite Anthropic SDK~\cite{anthropic_docs}, con un
+        thin adapter che normalizza il diverso protocollo di tool use.
 \end{itemize}
 
 Entrambe le varianti condividono lo stesso schema BigQuery, lo stesso
@@ -504,7 +488,7 @@ dataset, la stessa interfaccia utente e gli stessi tool disponibili.
 La differenza è confinata al modello LLM e all'adapter di integrazione.
 
 La motivazione principale di questo confronto è la \emph{diversificazione
-del vendor}. Affidarsi a un unico fornitore di modelli per tutti gli
+  del vendor}. Affidarsi a un unico fornitore di modelli per tutti gli
 agenti aziendali crea una dipendenza tecnologica e commerciale che la
 cooperativa ha ritenuto prudente mitigare fin dalla fase di sviluppo.
 Il confronto controllato su uno stesso dominio --- stessa struttura
@@ -521,25 +505,25 @@ riportati nel Capitolo~\ref{chap:orion-valutazione}.
 % orizzontali di diverso spessore, molto più eleganti di \hline.
 % La specifica {lll} definisce 3 colonne allineate a sinistra.
 \begin{table}[htbp]
-    \centering
-    \caption[Confronto architetturale SysAid Gemini vs.\ SysAid Sonnet]{Confronto
+  \centering
+  \caption[Confronto architetturale SysAid Gemini vs.\ SysAid Sonnet]{Confronto
     architetturale tra le due varianti di SysAid. Le righe in grassetto
     evidenziano i punti di differenza tra le varianti.}
-    \label{tab:sysaid-confronto}
-    \begin{tabular}{lll}
-        \toprule
-        \textbf{Dimensione} & \textbf{SysAid Gemini} & \textbf{SysAid Sonnet} \\
-        \midrule
-        Modello LLM              & Gemini 2.5 Flash / Pro        & Claude Sonnet 4.6        \\
-        Piattaforma              & Vertex AI (GCP)               & Anthropic SDK            \\
-        \textbf{Protocollo tool} & \textbf{Vertex AI func.\ call}& \textbf{tool\_use block} \\
-        \textbf{Thin adapter}    & \textbf{No}                   & \textbf{Sì}              \\
-        Schema BigQuery          & Condiviso                     & Condiviso                \\
-        Dataset di test          & Condiviso                     & Condiviso                \\
-        Frontend React           & Condiviso                     & Condiviso                \\
-        Tool disponibili         & run\_sql, analyze, chart      & run\_sql, analyze, chart \\
-        \bottomrule
-    \end{tabular}
+  \label{tab:sysaid-confronto}
+  \begin{tabular}{lll}
+    \toprule
+    \textbf{Dimensione}      & \textbf{SysAid Gemini}         & \textbf{SysAid Sonnet}   \\
+    \midrule
+    Modello LLM              & Gemini 2.5 Flash / Pro         & Claude Sonnet 4.6        \\
+    Piattaforma              & Vertex AI (GCP)                & Anthropic SDK            \\
+    \textbf{Protocollo tool} & \textbf{Vertex AI func.\ call} & \textbf{tool\_use block} \\
+    \textbf{Thin adapter}    & \textbf{No}                    & \textbf{Sì}              \\
+    Schema BigQuery          & Condiviso                      & Condiviso                \\
+    Dataset di test          & Condiviso                      & Condiviso                \\
+    Frontend React           & Condiviso                      & Condiviso                \\
+    Tool disponibili         & run\_sql, analyze, chart       & run\_sql, analyze, chart \\
+    \bottomrule
+  \end{tabular}
 \end{table}
 
 Dal punto di vista architetturale, la principale differenza tecnica

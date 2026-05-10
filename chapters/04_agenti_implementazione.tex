@@ -4,14 +4,22 @@
 % POLPA, parte A2 di B (agenti).
 % Scopo: dettagli tecnici sufficienti a convincere della SOLIDITA'
 % delle realizzazioni, senza diventare documentazione operativa.
-% Le scelte non peculiari (FastAPI, React, Terraform) si enunciano
-% ma non si motivano in dettaglio.
-%
-% Ordine di scrittura: PRIMO (insieme al Cap. 3).
 % =====================================================================
 
 \chapter{La suite di agenti: implementazione}
 \label{chap:agenti-implementazione}
+
+Mentre il Capitolo~\ref{chap:agenti-architettura} ha presentato i principi guida
+e le scelte progettuali ad alto livello, questo capitolo descrive il modo in cui
+tali scelte sono state effettivamente realizzate. La trattazione è organizzata in
+due movimenti: dapprima si descrivono gli elementi trasversali alla suite (stack
+tecnologico, organizzazione del codice, infrastruttura come codice e catena di
+sicurezza); successivamente, ciascuno dei quattro agenti viene esaminato nei
+suoi dettagli implementativi rilevanti, con particolare attenzione alle decisioni
+non banali e a quelle che hanno richiesto un adattamento rispetto alla
+documentazione standard delle librerie e dei servizi cloud impiegati. Il livello
+di dettaglio scelto è quello sufficiente a giustificare la solidità delle
+realizzazioni, non quello di una documentazione operativa.
 
 % =====================================================================
 \section{Stack tecnologico, monorepo, infrastruttura, sicurezza}
@@ -20,156 +28,839 @@
 
 \subsection{Stack tecnologico}
 \label{subsec:agenti-stack-tech}
-% TODO — In una pagina, enunciare lo stack:
-% Backend: Python 3.10+, FastAPI, SQLAlchemy asincrono, asyncpg, httpx.
-% Frontend: React 19, TypeScript, Vite, Tailwind.
-% Database: Cloud SQL PostgreSQL 16, BigQuery.
-% LLM: Gemini 2.5 Flash/Pro (Vertex AI), Claude Sonnet 4.6 (Anthropic SDK).
-% Sicurezza: Model Armor, Cloud DLP, MSAL.
-% Infrastruttura: Cloud Run, Terraform, Cloud Build, Artifact Registry.
-% Citazioni: \cite{gcp_cloudrun}, \cite{gcp_vertexai}, \cite{terraform_docs},
-% \cite{anthropic_docs}.
 
-\subsection{Struttura della codebase}
+L'implementazione della suite di agenti è basata su uno stack cloud-native
+omogeneo, scelto per minimizzare la varianza operativa fra servizi e per
+delegare ai \emph{managed services} di Google Cloud Platform tutti i compiti
+infrastrutturali a basso valore aggiunto.
+
+\begin{itemize}
+  \item \textbf{Backend.} Tutti gli agenti sono scritti in Python~3.10+ ed
+        esposti tramite il framework asincrono FastAPI. La scelta è motivata
+        dalla natura prevalentemente \emph{I/O bound} delle interazioni con i
+        Large Language Model: la generazione di una risposta richiede da
+        centinaia di millisecondi a decine di secondi, quasi interamente spesi
+        in attesa del modello, dei motori di retrieval o di BigQuery. Il modello
+        di concorrenza \texttt{async/await} consente di sostenere centinaia di
+        richieste concorrenti per istanza Cloud Run senza ricorrere a
+        thread o processi multipli. L'accesso al database relazionale avviene
+        in modo asincrono tramite SQLAlchemy~2 e il driver
+        \texttt{asyncpg}, con \emph{pool} pre-pingati e ricicli automatici per
+        sopravvivere alle finestre di manutenzione del DBaaS.
+  \item \textbf{Frontend.} Le interfacce sono React~19 con TypeScript,
+        impacchettate con Vite e stilizzate con Tailwind~CSS. La scelta
+        di un \emph{bundler} ESM moderno è funzionale alla pipeline CI/CD:
+        il build è di pochi secondi anche su immagini di partenza minimali,
+        riducendo i tempi di rilascio.
+  \item \textbf{Database e Data Warehouse.} Cloud SQL per
+        PostgreSQL~15~\cite{gcp_cloudsql} è il \emph{system of record}
+        applicativo: vi risiedono utenti, conversazioni, messaggi, quote,
+        ACL, audit log e parametri di configurazione. Google
+        BigQuery~\cite{gcp_bigquery} è invece il motore analitico
+        utilizzato dagli agenti Text-to-SQL (AllyCare e SysAid), con
+        dataset alimentati in modo continuo da pipeline di replicazione
+        esterne al perimetro della suite.
+  \item \textbf{Large Language Models.} L'implementazione poggia su due
+        famiglie di modelli erogati come \emph{managed APIs}: Gemini~2.5
+        Flash e Pro su Vertex AI~\cite{gcp_vertexai}, e Claude Sonnet~4.6
+        attraverso l'SDK Anthropic veicolato dal canale
+        \texttt{AnthropicVertex}~\cite{anthropic_docs}. La duplicazione
+        deliberata in SysAid (Sez.~\ref{sec:agenti-sysaid-impl}) è la
+        prima leva concreta del principio di agnosticità descritto nel
+        Capitolo~\ref{chap:agenti-architettura}.
+  \item \textbf{Orchestrazione di agenti.} Per gli agenti più sofisticati
+        (Vera ed AllyCare) viene utilizzato il \emph{Google Agent
+        Development Kit}~(ADK)~\cite{google_adk_docs}, una libreria
+        ufficiale che astrae la gestione della sessione, l'invocazione
+        ciclica del modello e l'integrazione di \emph{tool} basati su
+        \emph{function calling}. Per CooPolicy e per la variante Gemini
+        di SysAid si è preferita l'invocazione diretta dell'SDK
+        \texttt{vertexai.generative\_models}, dove un controllo
+        granulare sul ciclo di chiamate vale di più dell'astrazione
+        offerta da ADK. La scelta evita di assumere una dipendenza
+        comune (LangChain~\cite{langchain_docs} o
+        LlamaIndex~\cite{llamaindex_docs}) che vincolerebbe l'evoluzione
+        a una sola comunità.
+  \item \textbf{Infrastruttura.} Ogni componente è un servizio
+        serverless eseguito su Google Cloud Run~\cite{gcp_cloudrun},
+        descritto interamente da codice Terraform~\cite{terraform_docs}.
+\end{itemize}
+
+\subsection{Organizzazione del codice}
 \label{subsec:agenti-monorepo}
-% TODO — Monorepo `c30-ai-agents` organizzato per servizio. Convenzione
-% `app/{api,services,models,core}` adottata sui backend maturi
-% (vera-backend). Refactor dei backend originariamente monolitici
-% (nps-backend, sysaid-backend).
 
-% [FIGURA/LISTATO 4.1] Estratto dell'albero del monorepo.
-%
-% \begin{figure}[h]
-%     \centering
-%     \begin{lstlisting}
-% c30-ai-agents/
-%   vera-backend/
-%   vera-frontend/
-%   docs-backend/         (CooPolicy)
-%   nps-backend/          (AllyCare)
-%   sysaid-backend/       (SysAid Gemini)
-%   sysaid-sonnet-backend/
-%   admin-portal-frontend/
-%   admin-frontend/
-%   iac-infrastructure/   (Terraform)
-%   ai-dev-documents/
-%     \end{lstlisting}
-%     \caption[Struttura del monorepo]{Estratto rilevante della struttura del monorepo \texttt{c30-ai-agents}.}
-%     \label{fig:monorepo_tree}
-% \end{figure}
+Il codice sorgente dell'intera suite vive in un unico monorepo Bitbucket,
+suddiviso in directory autoconsistenti, una per servizio. Ogni directory
+contiene il proprio \texttt{Dockerfile}, le proprie dipendenze, il proprio
+file di descrizione della pipeline (\texttt{cloudbuild.yaml}) e, dove
+necessario, una piccola suite di test.
 
-\subsection{Infrastruttura Terraform e pipeline CI/CD}
+\begin{figure}[h]
+  \centering
+  \begin{lstlisting}[language=bash]
+c30-ai-agents/
+  vera-backend/         # Vera (FastAPI + ADK + Gemini)
+  vera-frontend/
+  docs-backend/         # CooPolicy (FastAPI + Vertex AI RAG Engine)
+  nps-backend/          # AllyCare (FastAPI + ADK + Gemini + BigQuery)
+  nps-frontend/
+  sysaid-backend/       # SysAid Gemini (FastAPI + Vertex AI)
+  sysaid-sonnet-backend/# SysAid Claude (FastAPI + Anthropic SDK)
+  sysaid-frontend/
+  portal-frontend/      # Portale unico di accesso (MSAL)
+  admin-backend/        # Pannello amministrativo
+  admin-frontend/
+  iac-infrastructure/   # Terraform + Cloud Build
+  ai-dev-documents/     # Documentazione architetturale
+  \end{lstlisting}
+  \caption[Struttura del monorepo]{Struttura del monorepo. Ogni servizio è una
+  unit\`a di deploy autonoma; \texttt{iac-infrastructure} descrive l'ambiente
+  GCP nella sua interezza.}
+  \label{fig:monorepo_tree}
+\end{figure}
+
+I backend più maturi (Vera e Admin) adottano una separazione interna per
+\emph{concerns}: la directory \texttt{api/} contiene esclusivamente i router
+FastAPI; \texttt{services/} le funzioni di dominio prive di stato HTTP;
+\texttt{models/} le entit\`a SQLAlchemy; \texttt{schemas/} i modelli Pydantic
+per validazione di input e output; \texttt{core/} le utility trasversali
+(database, dipendenze, sicurezza). I backend più piccoli (CooPolicy, AllyCare e
+le due varianti SysAid) condividono la stessa filosofia in forma compressa, con
+un singolo \texttt{main.py} che monta i \emph{router} e una manciata di moduli
+ausiliari (\texttt{auth.py}, \texttt{tools.py}, \texttt{agent.py}). Questa
+deliberata asimmetria è stata mantenuta perché il \emph{churn} di codice in
+quegli agenti è basso: introdurre prematuramente l'astrazione a quattro
+directory sarebbe stato un costo senza beneficio.
+
+\subsection{Infrastruttura come codice e pipeline CI/CD}
 \label{subsec:agenti-iac}
-% TODO — Terraform multi-ambiente (test/prod), modulo `cloud_run_services`
-% parametrizzato. Pipeline Cloud Build -> Artifact Registry -> Cloud Run.
-% VPC egress `PRIVATE_RANGES_ONLY`. PSC per Cloud SQL. Template
-% Model Armor e DLP deployati via IaC.
 
-% [FIGURA 4.2] Pipeline CI/CD: push su Cloud Source Repo -> Cloud Build
-% -> immagine in Artifact Registry -> deploy su Cloud Run.
-%
-% \begin{figure}[h]
-%     \centering
-%     \includegraphics[width=0.9\textwidth]{fig04_cicd_pipeline.pdf}
-%     \caption[Pipeline CI/CD]{Pipeline di build e deploy per ciascun servizio della suite: push su branch \texttt{test} o \texttt{main}, build container, push su Artifact Registry, deploy su Cloud Run con configurazione gestita da Terraform.}
-%     \label{fig:cicd_pipeline}
-% \end{figure}
+L'intera infrastruttura GCP è descritta in Terraform~\cite{terraform_docs} ed è
+parametrizzata su due ambienti, \texttt{test} e \texttt{prod}, gestiti come
+\emph{workspace} indipendenti con \emph{state} remoto su un bucket Cloud
+Storage. Le risorse provisionate comprendono: l'abilitazione delle API GCP
+necessarie, le istanze Cloud Run con i loro service account dedicati, l'istanza
+Cloud SQL con il relativo \emph{Private Service Connect} consumer endpoint, le
+politiche di Identity and Access Management (IAM), il bucket di Artifact
+Registry per le immagini Docker, il template Model Armor, la rete (subnet,
+indirizzi IP riservati, regole di forwarding) e il bilanciatore di carico HTTPS
+interno con il certificato TLS recuperato da Secret Manager.
 
-\subsection{Autenticazione, audit, sicurezza}
+Le decisioni di sicurezza fondamentali sono codificate direttamente nel
+modulo Terraform e dunque non sono modificabili senza una \emph{pull request}
+revisionata:
+
+\begin{enumerate}
+  \item \textbf{Egress limitato a indirizzi privati.} Ogni servizio Cloud Run
+        è collegato alla VPC interna mediante \emph{Direct VPC Egress} con
+        \texttt{egress = PRIVATE\_RANGES\_ONLY}: il container può raggiungere
+        gli endpoint privati GCP (Vertex AI, BigQuery, Cloud SQL, RAG Engine)
+        ma non internet pubblico. Il vincolo è particolarmente importante per
+        gli agenti Text-to-SQL, dove un'eventuale estrazione di dati verso
+        l'esterno via DNS o webhook è di fatto resa impossibile a livello di
+        rete.
+  \item \textbf{Database non esposto su IP pubblico.} L'istanza Cloud SQL ha
+        \texttt{ipv4\_enabled = false}: la connessione passa solo attraverso
+        \emph{Private Service Connect} (PSC), con un \emph{forwarding rule}
+        regionale verso il \emph{service attachment} di Cloud SQL.
+  \item \textbf{Bilanciatore di carico interno.} Il \emph{frontend} è
+        accessibile solo via un \emph{Application Load Balancer regionale
+        interno} (\texttt{INTERNAL\_MANAGED}) che termina TLS con un
+        certificato wildcard custodito in Secret Manager. L'esposizione
+        avviene perciò solo all'interno della rete aziendale o, per gli
+        utenti remoti, dietro VPN, soddisfacendo il requisito di
+        accesso privato (Cap.~\ref{chap:agenti-architettura},
+        Sez.~\ref{sec:agenti-principi}).
+  \item \textbf{Segregazione di credenziali.} Tutte le password generate
+        (database, JWT) sono prodotte da \texttt{random\_password},
+        depositate in Secret Manager e iniettate nei container via
+        \texttt{value\_source.secret\_key\_ref}: nessun segreto
+        attraversa mai il file system dello sviluppatore.
+\end{enumerate}
+
+La pipeline CI/CD si attiva ad ogni \emph{push}: in ambiente di test sul branch
+\texttt{test}, in produzione sul branch \texttt{main}. Cloud Build, configurato
+tramite un \emph{trigger} per ciascun servizio collegato al rispettivo
+repository Bitbucket, esegue i passi descritti nel \texttt{cloudbuild.yaml}
+locale: build dell'immagine Docker, push su Artifact Registry e aggiornamento
+dell'immagine attiva del relativo servizio Cloud Run. Per l'ambiente di
+produzione, il \emph{trigger} ha \texttt{approval\_required = true}, che
+implementa lo step approvativo richiesto dal principio di
+\emph{Automazione dei rilasci} (Cap.~\ref{chap:agenti-architettura}).
+
+\subsection{Identità, autenticazione e autorizzazione}
 \label{subsec:agenti-auth}
-% TODO — Flusso MSAL -> JWT locale, middleware quota, sanitizzazione DLP
-% pre-generazione, filtri Model Armor, audit logging a livello di
-% messaggio con tracciamento dei token. Citazioni: \cite{msft_msal},
-% \cite{gcp_modelarmor}, \cite{gcp_dlp}, \cite{perez2022promptinjection}.
 
-% [FIGURA 4.3] Punti di intercettazione DLP + Model Armor nel flusso
-% di una request.
-%
-% \begin{figure}[h]
-%     \centering
-%     \includegraphics[width=0.85\textwidth]{fig04_security_chain.pdf}
-%     \caption[Catena di sicurezza pre-generazione]{Punti di intercettazione: sanitizzazione PII via Cloud DLP e filtri Responsible AI via Model Armor, applicati prima e dopo la generazione.}
-%     \label{fig:security_chain}
-% \end{figure}
+L'autenticazione è interamente delegata a Microsoft Entra ID, che è il
+\emph{tenant} identitario già adottato dalla cooperativa. La scelta del flusso
+e della libreria segue lo standard di mercato per le \emph{single-page
+applications}: il browser ottiene un \emph{access token} via
+OAuth~2.0~\cite{rfc6749oauth2} e OpenID Connect~\cite{oidc1_0core} con
+\emph{Authorization Code Flow + PKCE}, gestito dalla
+\emph{Microsoft Authentication Library} (MSAL)~\cite{msft_msal} caricata nel
+portale e nel pannello di amministrazione. Il token è un JWT firmato in
+RS256~\cite{rfc7519jwt} ed è il vettore di autorizzazione che attraversa la
+suite.
+
+Sul lato server, ogni backend monta una dipendenza FastAPI \texttt{verify\_token}
+che esegue le verifiche minime ma non negoziabili: scarica e mette in cache
+le chiavi pubbliche da \texttt{JWKS} esposto da Microsoft, identifica la
+chiave corretta tramite il campo \texttt{kid} dell'header, decodifica il
+token con la libreria \texttt{python-jose} validandone audience e
+firma e, infine, valida manualmente l'\texttt{issuer} contro la coppia
+\texttt{(sts.windows.net, login.microsoftonline.com)}: questa
+ridondanza è necessaria perché Entra ID emette token con \texttt{iss}
+v1 o v2 a seconda dell'\emph{endpoint} usato, e l'opzione \texttt{verify\_iss}
+del decoder accetta un solo valore alla volta. Una rotazione di chiavi non
+prevista forza un secondo \emph{fetch} del JWKS prima di restituire un
+errore 401: la cache non è quindi un \emph{single point of failure}.
+
+L'autorizzazione fine-grained si basa sui claim del JWT:
+\texttt{preferred\_username}, \texttt{Ruolo}, \texttt{Direzione} sono
+propagati dai sistemi HR a Entra ID, e la lista dei gruppi (campo
+\texttt{group Vera AI}) è quanto consente l'accesso selettivo ai dati
+sensibili. CooPolicy in particolare confronta i gruppi del chiamante con
+una \emph{whitelist} configurata via env (\texttt{DOCS\_ALLOWED\_GROUPS})
+prima di accettare la richiesta: se l'utente non vi appartiene, riceve
+un 403 senza che l'esistenza dei corpus venga rivelata.
+
+\subsection{Catena di sicurezza pre e post generazione}
+\label{subsec:agenti-security}
+
+Coerentemente con il principio di governance facilitata, ogni invocazione di
+modello attraversa una catena di controlli predisposta nel servizio
+\texttt{model\_armor\_service.py} di Vera, e replicata in forma più snella
+negli altri agenti. La catena ha tre stadi:
+
+\begin{enumerate}
+  \item \textbf{Sanitizzazione del prompt.} Prima di inviare il messaggio
+        all'LLM, il testo passa per il template di Google Cloud Model
+        Armor~\cite{gcp_modelarmor}, che combina un classificatore di
+        \emph{Responsible AI} (categorie \emph{hate}, \emph{harassment},
+        \emph{sexually explicit}, \emph{dangerous}) con il rilevatore
+        di \emph{prompt injection}~\cite{perez2022promptinjection} e con
+        la \emph{Sensitive Data Protection} di Google Cloud~\cite{gcp_dlp}
+        per le PII. I tipi PII rilevanti per il contesto italiano (Codice
+        Fiscale, Partita IVA, IBAN) sono configurati come \emph{custom
+        info types}; quando la PII viene rilevata, il backend non
+        sostituisce ciecamente il valore ma rifiuta la richiesta con un
+        messaggio che invita l'utente a riformulare. Il rifiuto è
+        appropriato perché l'autenticità del dato originale è spesso
+        necessaria per l'utilità della risposta, e il \emph{tokenizing}
+        cieco produrrebbe risposte inutilizzabili.
+  \item \textbf{Esenzioni per gruppo.} Alcuni gruppi (ad esempio l'ufficio
+        legale) hanno legittimo bisogno di trattare PII specifiche.
+        Una tabella PostgreSQL \texttt{model\_armor\_group\_exemptions}
+        e una \texttt{pii\_group\_exemptions} consentono di escludere
+        per gruppo singoli filtri (ad esempio \texttt{prompt\_injection}
+        o singole categorie RAI) o singoli tipi di PII. Al momento
+        della verifica, il backend interseca la lista di esenzioni
+        attive per l'utente con i \emph{reasons} restituiti da Model
+        Armor: se ogni motivo è coperto da esenzione, la richiesta
+        prosegue.
+  \item \textbf{Sanitizzazione della risposta e audit.} La stessa funzione
+        di sanitizzazione viene applicata all'output del modello prima del
+        salvataggio in conversazione, e ogni interazione è registrata in
+        modo strutturato nella tabella \texttt{chat\_logs} con
+        \emph{action}, modello selezionato, conteggio token in/out e flag
+        di citazioni. Eventi di blocco vengono inoltre registrati su un
+        \emph{security log} dedicato (\texttt{security\_logger.log\_prompt\_blocked},
+        \texttt{log\_response\_blocked}), che alimenta la dashboard di
+        amministrazione descritta in Sez.~\ref{sec:agenti-admin-impl}.
+\end{enumerate}
+
+Il consumo di token è controllato dal servizio di quota: il backend stima
+preventivamente il consumo della richiesta, lo confronta con il budget mensile
+del badge dell'utente (\emph{Bronze}, \emph{Silver}, \emph{Gold}) e blocca
+con un 400 se il limite sarebbe superato. Al termine della chiamata il
+consumo effettivo viene contabilizzato. Questo è il meccanismo concreto che
+realizza il principio di \emph{Implementazione sostenibile} del
+Cap.~\ref{chap:agenti-architettura}.
 
 % =====================================================================
-\section{Vera — backend e frontend}
+\section{Vera --- backend e frontend}
 \label{sec:agenti-vera-impl}
 % =====================================================================
-% TODO — POLPA agente 1 (implementazione).
-% - Integrazione Google Search grounding via Vertex AI.
-% - Model router euristico: regole sulla forma della query (lunghezza,
-%   presenza di keyword) per scegliere Flash o Pro.
-% - Streaming SSE: come e' implementato lato backend (asyncgen +
-%   StreamingResponse) e lato frontend (EventSource).
-% - Quota accounting post-generazione: trigger su tabella conversation_messages.
-% - Frontend: componenti chiave, gestione delle citazioni inline (mappare
-%   i grounding_chunks restituiti da Vertex AI).
-%
-% Includere uno snippet di codice (router euristico o chiamata
-% Vertex AI con grounding abilitato).
 
-% [LISTATO 4.4] Snippet di codice: chiamata a Vertex AI con Google
-% Search grounding abilitato.
+Vera è il backend più articolato della suite e l'unico che nasce da una
+codebase pre-esistente, gradualmente refattorizzata in moduli verticali
+(\texttt{api/}, \texttt{services/}, \texttt{adk/}, \texttt{models/},
+\texttt{schemas/}, \texttt{core/}). Le scelte realizzative significative
+ruotano attorno a quattro problemi: \emph{routing} del modello, \emph{streaming}
+SSE robusto, \emph{Web grounding} con citazioni inline, gestione dei documenti
+caricati dall'utente.
+
+\subsection{Routing del modello: badge e complessità della query}
+\label{subsec:vera-routing}
+
+La selezione del modello è governata dal modulo \texttt{model\_router.py} con
+una logica a due livelli. Il primo livello deriva dal badge: Bronze è limitato
+a Gemini~2.5 Flash, Gold ha accesso esclusivo a Gemini~2.5 Pro, Silver è in
+\emph{tier} intermedio. Il secondo livello, attivo solo per Silver, valuta
+euristicamente la complessità della richiesta sommando tre indicatori
+(lunghezza superiore a 500~caratteri, presenza di parole-chiave riconducibili
+ad analisi articolate, presenza di più punti interrogativi) e instrada verso
+Pro se almeno due indicatori sono positivi. Se nel database è configurato un
+mapping esplicito badge--modello (tabella \texttt{badge\_model\_access}), la
+logica DB ha precedenza sull'euristica, in modo che gli amministratori
+possano modificare il comportamento senza un nuovo deploy. La scelta di
+mantenere il \emph{fallback} euristico anche in presenza della tabella DB ha
+un costo di poche righe di codice e mette al riparo il sistema da
+configurazioni vuote in ambienti freschi.
+
+Questa logica realizza in forma essenziale, e per uso interno al singolo
+agente, il \emph{cost-quality trade-off} formalizzato dalla letteratura sul
+\emph{LLM routing}~\cite{chen2023frugalgpt,ong2024routellm}: un modello più
+piccolo è preferito quando è sufficiente, un modello più grande è impiegato
+solo quando la query lo giustifica.
+
+\subsection{Streaming SSE con sessioni dedicate e keepalive ticker}
+\label{subsec:vera-sse}
+
+L'endpoint \texttt{/chat/stream} restituisce una \texttt{StreamingResponse}
+FastAPI di tipo \texttt{text/event-stream}. La struttura del generatore
+asincrono che la alimenta è il risultato di un'iterazione architetturale
+non banale: la prima versione, che condivideva la \texttt{AsyncSession}
+SQLAlchemy fra il pre-\emph{check} di quota e il loop di streaming,
+provocava \emph{rollback} spuri al secondo messaggio della stessa
+conversazione, perché FastAPI chiudeva la sessione iniettata al ritorno
+del \texttt{StreamingResponse} mentre il generatore era ancora attivo.
+La soluzione adottata è separare due sessioni: \texttt{pre\_db}, di vita
+breve, esegue tutti i controlli sincroni (quota, sanitizzazione del
+prompt via Model Armor, scelta del modello, \emph{lookup} della
+conversazione, caricamento della history) e viene chiusa subito; una
+seconda sessione \texttt{stream\_db} è creata all'interno del
+generatore e vive per tutta la durata dello stream. I dati che
+attraversano il confine tra le due sessioni sono primitivi (UUID,
+stringhe, dizionari), così da non innescare \emph{lazy loading} con
+sessione chiusa.
+
+Un secondo accorgimento è il \emph{keepalive ticker}: ogni 3~secondi un
+task asincrono pubblica nella coda di eventi un commento SSE
+(\texttt{": keepalive\textbackslash n\textbackslash n"}) che attraversa il
+flusso senza essere rappresentato lato client. Senza questo dispositivo,
+proxy e browser (in particolare Firefox) chiudono la connessione durante
+le pause prolungate del modello (primo token, retrieval, rate limit
+transienti). La coda di eventi è una \texttt{asyncio.Queue} che multiplex
+flussi di dati e ticker; un sentinella \texttt{None} segnala la fine
+dello stream e il task di \emph{ticker} viene cancellato in finally.
+
+\subsection{Pattern di esecuzione: documenti vs Web grounding}
+\label{subsec:vera-paths}
+
+Il generatore distingue due percorsi mutuamente esclusivi sulla base della
+presenza di documenti caricati nella conversazione. Quando ci sono \emph{upload}
+in stato \texttt{ready}, viene costruita o riusata una \emph{Gemini Context
+Cache} associata alla conversazione, che evita di ricaricare i medesimi
+documenti a ogni turno; la generazione avviene quindi tramite l'agente ADK
+\texttt{doc\_qa\_agent}, configurato in modo da utilizzare la cache come
+contenuto pre-cacheato (\texttt{generate\_content\_config.cached\_content}).
+In assenza di upload, il generatore percorre il \emph{path} di conversazione
+generale, che monta un \texttt{LlmAgent} ADK con
+l'\texttt{EnterpriseWebSearchTool} integrato: il modello decide
+autonomamente, in base alla domanda, se invocare la \emph{search} o
+rispondere con la sola conoscenza parametrica.
+
+In entrambi i percorsi la frammentazione dell'output è gestita con la modalità
+\texttt{StreamingMode.SSE} di ADK: il \emph{loop} di eventi del Runner emette
+\texttt{Event} parziali, di cui vengono propagate solo le \texttt{parts} con
+campo \texttt{partial = True}, escludendo i blocchi marcati come
+\texttt{thought}. Quando il modello restituisce \texttt{finish\_reason}
+uguale a \texttt{MAX\_TOKENS}, il backend invia automaticamente un turno
+addizionale ``Continua la risposta dal punto esatto in cui si è interrotta''
+fino a una soglia di sicurezza (\texttt{\_MAX\_CONTINUATIONS = 4}), così
+da rendere la risposta completa anche quando supera il limite di output del
+modello.
+
+\subsection{Citazioni inline e \emph{grounding metadata}}
+\label{subsec:vera-citations}
+
+Quando il modello invoca la \emph{Web search}, l'evento ADK porta in un campo
+dedicato (\texttt{event.grounding\_metadata}) la lista dei chunk consultati,
+con URL, titolo e \emph{snippet}. La funzione \texttt{extract\_web\_citations}
+trasforma questa struttura in un array di citazioni che il frontend rende
+inline, cliccabili dall'utente. Per i documenti caricati la citazione viene
+estratta da un \texttt{citation\_extractor} che attraversa il testo finale e
+risolve i riferimenti contro la lista dei \texttt{cache\_uploads}. Il fatto
+che la fonte sia sempre verificabile e cliccabile, e che la sua presenza sia
+imposta dal sistema (non opzionale per il modello), realizza il vincolo di
+verificabilità descritto in
+Cap.~\ref{chap:agenti-architettura}, Sez.~\ref{subsec:vera-caso-uso}.
 
 % =====================================================================
-\section{CooPolicy — backend (\texttt{docs-backend})}
+\section{CooPolicy --- backend}
 \label{sec:agenti-coopolicy-impl}
 % =====================================================================
-% TODO — POLPA agente 2 (implementazione).
-% - Query expansion con Gemini Flash: prompt, formato di output.
-% - Retrieval RAG Engine con threshold (0.25 di default) e top-k 10.
-% - Generazione con Pro a temperatura bassa per ridurre creativita'.
-% - Costruzione delle citazioni inline (markdown reference).
-% - Tabella ACL: mapping gruppo Entra ID -> visibilita' agente.
-%
-% [LISTATO 4.5] Snippet della query expansion + retrieval.
+
+CooPolicy è la realizzazione ``RAG-native'' della suite: tutto il backend
+ruota attorno alla pipeline di Retrieval-Augmented
+Generation~\cite{lewis2020rag}, con scelte mirate a comprimere il rumore di
+recupero, ad ancorare la generazione esclusivamente al materiale recuperato e
+a rispettare le ACL aziendali sui documenti.
+
+\subsection{Multi-corpus e classificazione della query}
+\label{subsec:coopolicy-multicorpus}
+
+Una prima scelta architetturalmente significativa è la rinuncia al
+\emph{single corpus}. La documentazione interna è ripartita in dieci corpus
+Vertex AI~\cite{gcp_vertex_rag} tematici (\texttt{policy-hr},
+\texttt{contratti-smartworking}, \texttt{amministrazione-personale},
+\texttt{procedure-aziendali}, \texttt{processi-regolamenti},
+\texttt{governance-identita}, \texttt{sicurezza},
+\texttt{punti-vendita-operativita}, \texttt{materiale-pdv},
+\texttt{comunicazioni-generali}), ciascuno con un proprio descrittore in
+italiano del dominio coperto. La motivazione è duplice: da un lato la
+qualità del retrieval cala rapidamente al crescere della cardinalità dei
+chunk indicizzati nello stesso spazio vettoriale; dall'altro, alcune
+classi di documenti hanno regole di accesso o di interpretazione
+specifiche (i contratti collettivi vincolano la risposta in modo diverso
+dalle policy aziendali) e mantenerle separate facilita l'evoluzione
+indipendente.
+
+A monte del retrieval, una funzione \texttt{classify\_query} chiede a
+Gemini~2.5 Flash di scegliere il \emph{corpus primario} ed eventualmente
+un \emph{corpus secondario} fra quelli configurati, restituendo
+strettamente un oggetto JSON con due chiavi. La scelta di Gemini Flash è
+motivata dalla coppia di richieste essenziale di questo passo: bassa
+latenza (sub-secondo) e basso costo unitario, condizione necessaria
+perché il classificatore venga invocato a ogni richiesta senza pesare
+sull'economia del sistema. Il prompt include il descrittore di ciascun
+corpus disponibile e due regole-guida specifiche per il dominio coop
+(domande su indennità di livello impongono il corpus contratti, domande
+su nomi propri o organigrammi impongono il corpus governance), che
+correggono ex ante errori di classificazione osservati durante la fase di
+\emph{tuning}.
+
+\subsection{Retrieval ibrido e soglia di rilevanza}
+\label{subsec:coopolicy-retrieval}
+
+Il retrieval è eseguito in parallelo sui corpus selezionati attraverso
+\texttt{rag.retrieval\_query} di Vertex AI RAG Engine~\cite{gcp_vertex_rag},
+con \texttt{top\_k = 40} sul corpus primario e \texttt{top\_k = 20} sul
+secondario quando presente. La modalità di ricerca preferita è
+\emph{hybrid} (\texttt{rag.HybridSearch} con \texttt{alpha = 0.5}), che
+bilancia ricerca vettoriale densa e matching lessicale BM25:
+l'\emph{alpha} 0.5 è stato scelto per bilanciare due esigenze
+spesso in tensione, la robustezza semantica della ricerca densa e la
+precisione su nomi propri, codici di policy e termini tecnici esatti
+(es. ``CCNL'', ``RGPD'', codici di reparto), per i quali il segnale BM25
+è insostituibile. Quando il corpus non supporta la modalità ibrida, il
+codice ricade in modo automatico sulla sola ricerca vettoriale, evitando
+errori di parametri.
+
+I chunk restituiti sono filtrati con una soglia
+\texttt{RAG\_SCORE\_THRESHOLD~=~0.15} sulla distanza coseno: il valore è
+deliberatamente permissivo, in coerenza con la decisione di delegare al
+modello generativo (vincolato dal \emph{system prompt}) la decisione su
+quali chunk siano effettivamente utili. Il rationale è che un modello in
+modalità a bassa temperatura (Sez.~\ref{subsec:coopolicy-generation})
+sa rifiutare contesto irrilevante, mentre una soglia troppo restrittiva
+rischia di escludere materiale marginalmente rilevante che però contiene
+la risposta. I risultati di primario e secondario vengono uniti,
+deduplicati per testo identico, ordinati per distanza coseno crescente
+e troncati a \texttt{RAG\_TOP\_K} chunk totali.
+
+Una linea di sviluppo recente è la richiesta di \emph{query expansion}
+ispirata a~\cite{ma2023query_expansion} e a HyDE~\cite{gao2022hyde}. Nella
+versione attuale di CooPolicy non è ancora attiva: la combinazione
+multi-corpus + hybrid + soglia bassa ha mostrato sufficiente \emph{recall}
+per il dominio in esame; restano disponibili come direttrice di
+miglioramento in caso si registri un calo di \emph{recall} con la
+crescita del corpus.
+
+\subsection{Arricchimento dei chunk e gestione dei metadati}
+\label{subsec:coopolicy-meta}
+
+Ogni PDF nel bucket GCS è accompagnato da un sidecar \texttt{.meta.json}
+generato in fase di ingestione, contenente titolo leggibile e data del
+documento. La funzione \texttt{\_enrich\_chunks\_with\_meta} scarica in
+parallelo i sidecar dei chunk recuperati, con cache in-memory a TTL
+un'ora, e arricchisce ciascun chunk con il titolo umano-leggibile e con la
+data; quest'ultima è poi utilizzata dal modello per privilegiare la
+fonte più recente in caso di ridondanza informativa. I file di metadati
+(\texttt{.json}) e i tabulari grezzi (\texttt{.csv}), che possono
+finire indicizzati per altri motivi, sono filtrati esplicitamente prima
+di costruire il prompt, evitando che il modello citi rumore.
+
+\subsection{Generazione vincolata e citazioni}
+\label{subsec:coopolicy-generation}
+
+Il prompt di sistema impone, in italiano, sette regole non negoziabili:
+analisi integrale dei documenti recuperati prima di rispondere; risposta
+basata esclusivamente sul materiale fornito; obbligatoriet\`a delle
+citazioni \texttt{[N]} inline; massima precisione su numeri, articoli e
+condizioni; divieto esplicito di parafrasi libere; tono professionale
+italiano; consapevolezza temporale (preferire la fonte più recente,
+avvisare se il documento ha più di due anni). Il modello è Gemini~2.5 Pro
+con \texttt{temperature = 0.1} e \texttt{max\_output\_tokens = 8192}: la
+temperatura quasi zero massimizza l'aderenza al prompt e riduce
+ulteriormente il rischio di allucinazione~\cite{xu2024hallucination}, in
+linea con la funzione di un agente di tipo ``ricerca verificabile''.
+
+Il post-processing della risposta è il dispositivo che garantisce
+l'integrità delle citazioni. Le citazioni multiple
+(\texttt{[1, 2, 3]}) vengono espanse in citazioni singole
+(\texttt{[1][2][3]}); le citazioni con indice fuori dal range dei
+documenti realmente forniti --- ovvero le citazioni allucinate ---
+vengono rimosse dal testo finale; gli indici sono infine rinumerati
+in ordine di prima comparsa, in modo che la lista delle fonti
+restituita al frontend rispecchi l'ordine di lettura. Per ciascuna
+citazione viene anche estratto uno \emph{snippet} di 300~caratteri
+centrato sulle keyword della query, utile per la \emph{preview} nel
+pannello laterale del frontend.
+
+\subsection{ACL e proxy autenticato per i documenti}
+\label{subsec:coopolicy-acl}
+
+Il primo passo di ogni endpoint sensibile è
+\texttt{\_require\_docs\_group}: l'utente deve appartenere ad almeno un
+gruppo Entra ID inserito nella \emph{whitelist}
+\texttt{DOCS\_ALLOWED\_GROUPS}, altrimenti la richiesta è respinta con
+403 senza ulteriori dettagli. L'accesso al PDF originale, infine, non
+avviene tramite URL pubblico: l'endpoint \texttt{/api/docs/file} agisce
+come proxy autenticato che, verificato il token, ottiene un \emph{access
+token} cloud-platform tramite le credenziali del service account del
+servizio e scarica il binario direttamente dall'API di GCS, restituendolo
+con \texttt{Content-Disposition: inline}. Il modello non ha mai
+visibilit\`a degli URL firmati e l'utente non pu\`o aggirare la
+verifica del token visitando un link.
 
 % =====================================================================
-\section{AllyCare / NPS — backend}
+\section{AllyCare --- backend}
 \label{sec:agenti-allycare-impl}
 % =====================================================================
-% TODO — POLPA agente 3 (implementazione).
-% - Tool use con Gemini: declaration schema dei tre tool, gestione
-%   dell'agentic loop (max iterazioni, error handling).
-% - Gestione errori BigQuery: parsing degli errori SQL, retry con prompt
-%   correttivo.
-% - Generazione chart server-side (matplotlib o Vega-Lite renderizzato
-%   in PNG, embed in markdown response).
-% - Schema caching: come si seleziona quali tabelle iniettare nel prompt
-%   in funzione della query.
-%
-% [LISTATO 4.6] Tool declaration `run_sql` per Vertex AI.
+
+AllyCare è la realizzazione del paradigma Text-to-SQL su BigQuery per
+l'analisi dei sondaggi NPS. La traduzione di linguaggio naturale in SQL
+è un campo di ricerca attivo, con benchmark
+consolidati~\cite{yu2018spider,li2023bird} e tecniche di decomposizione e
+auto-correzione che migliorano l'accuratezza su query
+complesse~\cite{pourreza2023dinsql}. L'implementazione di AllyCare
+combina questi spunti con il paradigma agentico
+ReAct~\cite{yao2022react}, esponendo al modello tre \emph{tool} di
+interazione con i dati e affidando all'\emph{agentic loop} di ADK la
+gestione del ciclo Reason--Act--Observe.
+
+\subsection{Iniezione selettiva dello schema}
+\label{subsec:allycare-schema}
+
+Il prompt di sistema include lo schema BigQuery delle due tabelle
+rilevanti (\texttt{mapp\_nps\_survey\_internal\_prod} con i dati di
+sondaggio grezzi e \texttt{mapp\_nps\_survey\_ai\_enriched\_prod} con i
+campi prodotti da una pipeline di arricchimento AI a monte) ottenuto via
+\texttt{bq\_client.get\_table} e mantenuto in cache per un'ora. Allo
+schema tecnico viene affiancato un \emph{glossario semantico} in
+italiano: per ciascuna colonna è descritto il significato funzionale
+(es. \texttt{voto\_item01: ``Il personale del negozio è gentile e
+competente''; valori -2 = mancata risposta, -1 = non lo so, 0--9 = voto}).
+Insieme allo schema viene iniettata anche la lista esatta delle
+descrizioni di negozio (\texttt{store\_desc}, in cache 24~ore) tratta
+direttamente da BigQuery, in modo che il modello possa risolvere
+varianti colloquiali (``Sasso'', ``Iper Bologna'') in match esatti senza
+allucinare codici. Questa strategia di \emph{schema injection
+selettiva}, in luogo dell'esposizione del catalogo completo del data
+warehouse, è coerente con la letteratura
+Text-to-SQL~\cite{pourreza2023dinsql}: meno colonne il modello vede,
+meno opportunità ha di confondersi.
+
+Il prompt impone inoltre regole di consistenza SQL specifiche del
+dominio: i filtri sui voto-item devono includere \texttt{voto\_itemXX
+>= 0} nella \texttt{WHERE} (escludendo i marcatori \texttt{-1} e
+\texttt{-2}); tutti i confronti su campi categorici testuali devono
+usare \texttt{UPPER(TRIM(...))} per neutralizzare incoerenze di
+\emph{case}; la distinzione fra \texttt{LIKE} e uguaglianza esatta
+sui nomi di negozio segue regole esplicite. L'effetto è che AllyCare
+tipicamente non sbaglia i filtri ``stupidi'' che dominano gli errori in
+Text-to-SQL applicato in dominio reale.
+
+\subsection{Tre \emph{tool} e l'\emph{agentic loop} ADK}
+\label{subsec:allycare-tools}
+
+Lo strato di tool è dichiarato in \texttt{tools.py} ed esporta tre
+funzioni Python registrate come \emph{ADK tools}:
+
+\begin{description}
+  \item[\texttt{run\_sql(query)}]
+    Esegue una query SQL su BigQuery con un \emph{guard} sintattico: la
+    query è parsificata con \texttt{sqlparse} e respinta se contiene
+    \texttt{DDL} o \texttt{DML} di scrittura
+    (\texttt{INSERT}/\texttt{UPDATE}/\texttt{DELETE}); se non già
+    presente, viene aggiunto un \texttt{LIMIT~5000}; il job è eseguito
+    con \texttt{maximum\_bytes\_billed = 10\textsuperscript{9}} per
+    bloccare query accidentalmente costose. Il risultato è restituito
+    al modello come tabella Markdown delle prime 750~righe, con
+    indicazione del totale; la copia completa del DataFrame è
+    memorizzata nello \texttt{tool\_context.state} per essere
+    riutilizzata da \texttt{generate\_chart} senza una seconda
+    interrogazione. Se la query produce un errore SQL, il messaggio
+    viene impacchettato come \texttt{function\_response} e il modello
+    può auto-correggersi al ciclo successivo: questo è il meccanismo
+    concreto di \emph{self-correction}~\cite{pourreza2023dinsql}.
+  \item[\texttt{analyze\_comments(query, question)}]
+    Estrae un campione di commenti testuali grezzi mediante una query
+    dedicata, ne preleva un sotto-campione casuale di al più 200 record
+    e chiede a Gemini~2.5 Pro una sintesi qualitativa con citazioni
+    \emph{verbatim}. Il prompt di analisi è scritto in modo da essere
+    integrato nella risposta più ampia e a non duplicare l'intestazione
+    di sezione. È usato esclusivamente per analisi qualitative: per
+    qualunque dato quantitativo (sentiment, conteggi di temi, percentuali)
+    il prompt di sistema impone \texttt{run\_sql} sulla tabella
+    \texttt{ai\_enriched\_prod}.
+  \item[\texttt{generate\_chart(visualization\_goal)}]
+    Costruisce un grafico Matplotlib/Seaborn a partire dal DataFrame
+    cachato dall'ultimo \texttt{run\_sql}, scegliendo la rappresentazione
+    in funzione di parole-chiave nel \emph{goal}
+    (\texttt{torta}/\texttt{pie} $\rightarrow$ pie chart;
+    \texttt{linee}/\texttt{trend} $\rightarrow$ line chart; default
+    $\rightarrow$ bar chart). Il grafico è codificato in PNG, convertito
+    in base64 con prefisso \emph{data URI} e iniettato nel session state.
+    Il backend lo restituisce poi nella risposta come campo
+    \texttt{chart\_and\_data}, lasciando il rendering alla logica del
+    frontend. Il chart viene incluso nel payload finale solo se
+    \texttt{generate\_chart} è stato effettivamente invocato nel turno,
+    evitando di restituire il grafico del turno precedente.
+\end{description}
+
+L'\emph{agentic loop} è governato dal \texttt{Runner} ADK che, a partire
+dall'\texttt{LlmAgent} configurato con i tre tool e con il prompt di
+sistema, alterna in modo trasparente fasi di ragionamento e chiamate a
+tool fino a quando il modello restituisce la risposta finale. Il
+modello scelto per il turno (Pro o Flash) è iniettato nell'agente al
+momento della costruzione, e il prompt di sistema include il nome
+proprio dell'utente e la sua direzione (estratti dal token Entra ID),
+così che il tono della risposta sia personalizzato.
+
+Il modulo \texttt{select\_model} replica la logica già descritta per Vera
+in forma adattata al dominio: parole-chiave segnaletiche di analisi
+articolate (\texttt{commenti}, \texttt{sentiment}, \texttt{trend},
+\texttt{breakdown}, \texttt{voto\_item}) instradano verso Gemini~2.5
+Pro; richieste meramente quantitative (\texttt{quanti rispondenti},
+\texttt{media}, \texttt{nps medio}) verso Flash. Il default conservativo
+è Pro, perché un calo di qualità su domanda complessa è più visibile
+all'utente di un \emph{overspending} marginale.
+
+\subsection{Disciplina del ragionamento e garanzie anti-allucinazione}
+\label{subsec:allycare-discipline}
+
+Il prompt di sistema impone una disciplina di output esplicita: ogni
+risposta deve aprirsi con una sezione \texttt{\#\#\# RAGIONAMENTO} che
+enuncia obiettivo, scelta delle colonne, strategia SQL e nota
+anti-allucinazione; deve quindi chiamare il \emph{tool} appropriato
+prima di pronunciare numeri; deve infine produrre la sezione
+\texttt{\#\#\# RISPOSTA} solo dopo aver ricevuto i risultati. La
+disciplina è una forma di Chain-of-Thought esplicito~\cite{wei2022cot},
+estesa con un protocollo a due tag che separano in modo riconoscibile la
+fase di pianificazione dall'output utente. Una funzione
+\texttt{\_clean\_answer} elimina il blocco di ragionamento da quanto
+viene effettivamente mostrato all'utente, in modo che la
+trasparenza sia disponibile in audit (le righe del \emph{thought}
+restano nei \emph{log} ADK) ma l'esperienza utente sia pulita.
+
+La ``gerarchia della verità'' codificata nel prompt impone che i dati
+del database siano la sola fonte autoritativa: il modello non può
+classificare commenti per produrre numeri (la categorizzazione
+quantitativa va sempre dalla tabella arricchita). Una regola di
+``fiducia nel tool'' impone inoltre che, se \texttt{run\_sql} ha
+restituito un dato, sia quel dato a essere riportato, anche se il
+modello ricorda numeri diversi da turni precedenti. Questo accorgimento
+ha eliminato in fase di test una classe di errori in cui il modello,
+ricalcolando mentalmente, contraddiceva il proprio tool.
+
+\subsection{Resilienza operativa}
+\label{subsec:allycare-resilience}
+
+Il loop ADK è racchiuso in un \texttt{try/except} che riconosce gli
+errori transitori della piattaforma di inferenza
+(\texttt{RESOURCE\_EXHAUSTED}, \texttt{429}, \texttt{503}, \emph{rate
+limit}) e li ripete con \emph{backoff} esponenziale fino a tre
+tentativi, evitando che picchi di traffico contro Vertex AI degradino
+la qualità di servizio percepita dall'utente. La medesima strategia di
+retry transitorio è utilizzata anche da CooPolicy nelle chiamate al RAG
+Engine. Le query catturate dai tool sono accumulate nello
+\texttt{state} ADK e restituite al frontend come campo
+\texttt{queries}: l'utente può così ispezionare le SQL effettivamente
+eseguite, abilitando un meccanismo di trasparenza che è anche un
+deterrente di fatto contro errori silenziosi.
 
 % =====================================================================
-\section{SysAid — backend Gemini e backend Sonnet}
+\section{SysAid --- backend Gemini e backend Sonnet}
 \label{sec:agenti-sysaid-impl}
 % =====================================================================
-% TODO — POLPA agente 4 (implementazione, due varianti).
 
-\subsection{SysAid Gemini}
-\label{subsec:agenti-sysaid-gemini}
-% TODO — Stessa architettura del backend NPS, schema BigQuery diverso
-% (tabelle ticket SysAid). Tool use Vertex AI nativo.
+SysAid è l'implementazione su cui è stato condotto il primo esperimento
+controllato di indipendenza dal fornitore di LLM, costruendo due backend
+funzionalmente equivalenti, alimentati rispettivamente da Gemini~2.5
+Pro/Flash su Vertex AI e da Claude Sonnet~4.6 per il tramite di
+\texttt{AnthropicVertex}. La scelta di mantenere distinti due backend,
+invece di astrarre un unico backend con \emph{driver} polimorfi sul
+modello, è stata dettata dall'obiettivo dell'esperimento: rendere
+visibili in produzione, e per gli stessi utenti finali, le differenze
+di comportamento dei due modelli, evitando che lo strato di astrazione
+ne mascherasse le idiosincrasie. La presenza di entrambi prepara inoltre
+il terreno alla valutazione comparativa di Orion
+(Cap.~\ref{chap:orion-valutazione}), in linea con la metodologia
+\emph{LLM-as-a-Judge}~\cite{zheng2023llmjudge}.
 
-\subsection{SysAid Sonnet}
-\label{subsec:agenti-sysaid-sonnet}
-% TODO — Differenze rispetto al backend Gemini:
-% - Anthropic SDK \cite{anthropic_docs}: client, autenticazione via
-%   API key in Secret Manager.
-% - Tool use: traduzione dello schema dei tool dal formato Vertex AI
-%   al formato Anthropic (snake_case differenze, input_schema vs parameters).
-% - Gestione del ciclo: stop_reason: "tool_use" -> esecuzione tool ->
-%   tool_result message -> nuova chiamata.
-% - Cost accounting: pricing diverso (input/output token).
-%
-% [LISTATO 4.7] Adapter di traduzione tool schema Vertex AI -> Anthropic.
+\subsection{Architettura comparativa}
+\label{subsec:sysaid-arch-comp}
+
+L'architettura comparativa minimizza l'attrito sperimentale: schema
+BigQuery condiviso (vista \texttt{service\_req\_view} sulla base ticket
+SysAid), interfaccia React identica, prompt di sistema identico nei
+contenuti, set di tool funzionalmente equivalente (\texttt{run\_sql},
+\texttt{analyze\_text}, \texttt{generate\_chart}), conversazioni
+persistite su tabelle separate per non confondere i due flussi.
+
+\begin{table}[htbp]
+  \centering
+  \caption[Confronto implementativo SysAid Gemini vs.\ SysAid Sonnet]{Confronto
+    implementativo tra le due varianti di SysAid. Le righe evidenziate
+    mostrano le differenze tecniche significative.}
+  \label{tab:sysaid-confronto}
+  \begin{tabular}{lll}
+    \toprule
+    \textbf{Dimensione}      & \textbf{SysAid Gemini}        & \textbf{SysAid Sonnet}            \\
+    \midrule
+    Modello LLM              & Gemini 2.5 Flash / Pro        & Claude Sonnet 4.6                 \\
+    Piattaforma              & Vertex AI (\texttt{europe-west8}) & AnthropicVertex (\texttt{europe-west1}) \\
+    SDK                      & \texttt{vertexai.generative\_models} & \texttt{anthropic.AnthropicVertex} \\
+    \textbf{Schema dei tool} & \textbf{\texttt{FunctionDeclaration}} & \textbf{JSON Schema}     \\
+    \textbf{Stop reason tool} & \textbf{\texttt{function\_call} part} & \textbf{\texttt{stop\_reason = tool\_use}} \\
+    \textbf{Adattamento}     & \textbf{Nessuno}              & \textbf{Thin adapter dedicato}    \\
+    Schema BigQuery          & Condiviso                     & Condiviso                          \\
+    Prompt di sistema        & Identico                      & Identico                           \\
+    Tool disponibili         & \texttt{run\_sql}, \texttt{analyze\_text}, \texttt{generate\_chart}
+                                                             & \texttt{run\_sql}, \texttt{analyze\_text}, \texttt{generate\_chart} \\
+    Frontend React           & Condiviso                     & Condiviso                          \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Una nota architetturale non banale è la differenza di regione GCP fra le
+due varianti: Gemini è disponibile in \texttt{europe-west8}, mentre
+Claude Sonnet su Vertex è offerto al momento solo in
+\texttt{europe-west1}. Entrambe le regioni si trovano nel perimetro
+europeo e soddisfano il requisito di sovranità del dato, ma l'asimmetria
+ha conseguenze pratiche (latenza media leggermente più alta per Sonnet
+da Bologna, configurazioni Terraform separate) che i deploy futuri di
+nuovi agenti dovranno tenere in considerazione.
+
+\subsection{Variante Gemini: \emph{function calling} nativo}
+\label{subsec:sysaid-gemini}
+
+La variante \texttt{sysaid-backend} dichiara i tre tool con
+\texttt{FunctionDeclaration} di \texttt{vertexai.generative\_models},
+li raggruppa in un oggetto \texttt{Tool} e li passa al
+\texttt{GenerativeModel} insieme a \texttt{GENERATION\_CONFIG = \{
+"temperature": 0 \}}. Il \emph{loop} di ragionamento è scritto a mano:
+ad ogni risposta del modello, il backend ispeziona le \texttt{parts} alla
+ricerca di \texttt{function\_call}, esegue la funzione corrispondente,
+costruisce un \texttt{Part.from\_function\_response} con il risultato e
+lo aggiunge all'history per il turno successivo, fino a un cap di
+\texttt{MAX\_REASONING\_STEPS = 20} iterazioni. La temperatura zero,
+in continuità con CooPolicy e con la letteratura sulla
+calibrazione~\cite{kadavath2022knowsknows}, riduce la varianza
+dell'output e rende riproducibile il comportamento del modello su query
+identiche.
+
+\subsection{Variante Sonnet: \emph{thin adapter} per Anthropic}
+\label{subsec:sysaid-sonnet}
+
+La variante \texttt{sysaid-sonnet-backend} accede a Claude Sonnet
+attraverso \texttt{AnthropicVertex}, l'integrazione che permette di
+chiamare i modelli Anthropic mantenendo l'autenticazione e la fatturazione
+all'interno del progetto GCP~\cite{anthropic_docs}. L'API Anthropic
+attende una semantica diversa per i tool e per l'history dei messaggi
+rispetto a Vertex AI nativo, e questo richiede l'introduzione di un
+\emph{thin adapter} che si fa carico delle differenze.
+
+\paragraph{Definizione dei tool.} Mentre Gemini accetta
+\texttt{FunctionDeclaration} con \texttt{parameters} in formato
+proprietario, Anthropic richiede una lista di oggetti con campi
+\texttt{name}, \texttt{description} e \texttt{input\_schema} in
+JSON~Schema standard. La lista \texttt{SYSAID\_TOOLS} è quindi
+duplicata in JSON~Schema; il sotto-insieme \texttt{SYSAID\_TOOLS\_REPORT}
+omette \texttt{generate\_chart} ed è impiegato dall'endpoint di report
+giornalieri (cfr. canale WhatsApp), che non può rendere immagini.
+
+\paragraph{Loop a tool e \texttt{stop\_reason}.} Anthropic comunica
+l'invocazione di un tool interrompendo la generazione con
+\texttt{stop\_reason = "tool\_use"}. La risposta contiene blocchi
+tipizzati, fra cui zero o più \texttt{tool\_use} con \texttt{id},
+\texttt{name} e \texttt{input}. Il loop ripete fino a venti iterazioni:
+per ciascun blocco \texttt{tool\_use} esegue la funzione corrispondente,
+serializza il risultato in un blocco \texttt{tool\_result} con lo stesso
+\texttt{tool\_use\_id} e lo accoda come messaggio \emph{user}, prima di
+richiamare il modello. Quando \texttt{stop\_reason} è \texttt{end\_turn}
+e nessun tool è stato invocato in tutto il turno, un \emph{guardrail}
+specifico verifica che la sezione \texttt{\#\#\# RISPOSTA} non sia
+presente: se lo è, il modello ha tentato di rispondere senza chiamare
+\texttt{run\_sql}, e il backend forza un retry con un messaggio di
+correzione. È il riflesso anti-allucinazione del prompt, applicato lato
+controller invece che lato modello.
+
+\paragraph{Serializzazione dei content block.} L'SDK Anthropic
+restituisce content block che includono campi interni
+(\texttt{caller}, \texttt{parsed\_output}, \ldots) non accettati dall'API
+quando il blocco viene rispedito come parte dell'history. Per evitare
+errori 400, l'helper \texttt{\_content\_to\_api} applica una
+\emph{whitelist} per tipo di blocco
+(\texttt{text}, \texttt{tool\_use}, \texttt{tool\_result},
+\texttt{image}) che mantiene solo i campi documentati. Senza questa
+\emph{whitelist} le iterazioni successive del loop fallirebbero in modo
+ricorrente.
+
+\paragraph{Gestione di output lunghi e \emph{streaming} interno.} Per
+sostenere \texttt{max\_tokens = 32000} senza incorrere in timeout
+dell'SDK, il backend usa internamente l'API \emph{streaming} di
+Anthropic (\texttt{messages.stream}), accumulando il messaggio finale
+con \texttt{stream.get\_final\_message()} prima di processarlo nel
+loop. Quando \texttt{stop\_reason = "max\_tokens"}, il backend aggiunge
+un messaggio utente ``Continua\ldots'' e ripete il giro, in
+analogia con il meccanismo di continuation di Vera
+(Sez.~\ref{subsec:vera-paths}). Se il loop esce per esaurimento del
+budget di iterazioni con \texttt{\#\#\# RISPOSTA} ancora assente, un
+\emph{turno di sintesi forzata} chiede al modello di produrla con i
+dati gi\`a raccolti, evitando finestre vuote per l'utente.
+
+L'effetto netto del \emph{thin adapter} è che la logica di business
+condivisa (esecuzione SQL, analisi testuale, grafici, persistenza)
+risiede in una sola parte del backend e non viene duplicata; gli
+adattamenti rispetto al fornitore restano localizzati alla traduzione
+di schema dei tool, all'ispezione dei \texttt{stop\_reason} e alla
+serializzazione dei content block. La struttura ha permesso di
+rispettare il principio di \emph{Implementazione agnostica e
+sostenibile} senza aprire una refactoring globale degli agenti già in
+produzione.
 
 % =====================================================================
-\section{Admin}
+\section{Pannello di amministrazione}
 \label{sec:agenti-admin-impl}
 % =====================================================================
-% TODO — Cenni sul backend admin (router endpoints), JWT, integrazione
-% Entra ID lato amministratori. NON e' centrale per la tesi ma va
-% menzionato per completezza dell'infrastruttura.
-% Le pagine nuove introdotte da Orion sono trattate nel Cap. 6.
+
+Il monitoraggio e la configurazione dell'intera suite sono affidati a un
+servizio dedicato (\texttt{admin-backend} + \texttt{admin-frontend})
+deliberatamente isolato dagli applicativi rivolti all'utente finale. Il
+backend FastAPI espone i propri router sotto il prefisso
+\texttt{/api/admin/} e \`e composto da moduli verticali ciascuno
+focalizzato su un dominio: gestione utenti, quote per badge, statistiche
+di consumo, log audit, feedback strutturato, mapping
+badge--modelli, piani di rate limit, revisioni, conversation starter,
+impostazioni globali (es. temperatura), gruppi di esenzione PII e Model
+Armor. Il frontend React effettua un proprio login MSAL e, sul
+\emph{load balancer}, è instradato sul sub-path \texttt{/admin/}
+attraverso una regola di URL map dedicata, in modo da non condividere
+sessione e bundle JavaScript con il portale. Questa segregazione
+contiene il \emph{blast radius} di eventuali vulnerabilit\`a del
+pannello.
+
+Le funzioni di osservabilità sono già pensate in vista dell'evoluzione
+con Orion. La tabella \texttt{chat\_logs} (popolata da Vera, replicata
+con piccole variazioni dagli altri agenti) e i log strutturati di
+\texttt{security\_logger} costituiscono il fondamento dello stesso
+\emph{audit trail} che, una volta arricchito con il record di
+\texttt{orion\_routing\_logs} (Cap.~\ref{chap:orion-implementazione}),
+abiliterà la dashboard \emph{RouterMetrics} per la valutazione
+sperimentale della Sez.~\ref{chap:orion-valutazione}. Nessun nuovo
+servizio sarà perciò necessario per ospitare la telemetria
+dell'orchestratore.

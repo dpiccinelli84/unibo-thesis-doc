@@ -1,7 +1,7 @@
 % =====================================================================
 % CAPITOLO 4 — IMPLEMENTAZIONE DELLA SUITE DI AGENTI
 % =====================================================================
-% POLPA, parte A2 di B (agenti).
+% POLPA, parte A2 di B.
 % Scopo: dettagli tecnici sufficienti a convincere della SOLIDITA'
 % delle realizzazioni, senza diventare documentazione operativa.
 % =====================================================================
@@ -11,8 +11,8 @@
 
 Mentre il Capitolo~\ref{chap:agenti-architettura} ha presentato i principi guida
 e le scelte progettuali ad alto livello, questo capitolo descrive il modo in cui
-tali scelte sono state effettivamente realizzate. La trattazione è organizzata in
-due movimenti: dapprima si descrivono gli elementi trasversali alla suite (stack
+tali scelte sono state effettivamente realizzate. L'approccio è diviso in due fasi: 
+dapprima si descrivono gli elementi trasversali alla suite (stack
 tecnologico, organizzazione del codice, infrastruttura come codice e catena di
 sicurezza); successivamente, ciascuno dei quattro agenti viene esaminato nei
 suoi dettagli implementativi rilevanti, con particolare attenzione alle decisioni
@@ -22,7 +22,7 @@ di dettaglio scelto è quello sufficiente a giustificare la solidità delle
 realizzazioni, non quello di una documentazione operativa.
 
 % =====================================================================
-\section{Stack tecnologico, monorepo, infrastruttura, sicurezza}
+\section{Stack tecnologico, infrastruttura, sicurezza}
 \label{sec:agenti-stack}
 % =====================================================================
 
@@ -58,8 +58,7 @@ infrastrutturali a basso valore aggiunto.
         ACL, audit log e parametri di configurazione. Google
         BigQuery~\cite{gcp_bigquery} è invece il motore analitico
         utilizzato dagli agenti Text-to-SQL (AllyCare e SysAid), con
-        dataset alimentati in modo continuo da pipeline di replicazione
-        esterne al perimetro della suite.
+        dataset alimentati in modo continuo da flussi appositi.
   \item \textbf{Large Language Models.} L'implementazione poggia su due
         famiglie di modelli erogati come \emph{managed APIs}: Gemini~2.5
         Flash e Pro su Vertex AI~\cite{gcp_vertexai}, e Claude Sonnet~4.6
@@ -68,20 +67,12 @@ infrastrutturali a basso valore aggiunto.
         deliberata in SysAid (Sez.~\ref{sec:agenti-sysaid-impl}) è la
         prima leva concreta del principio di agnosticità descritto nel
         Capitolo~\ref{chap:agenti-architettura}.
-  \item \textbf{Orchestrazione di agenti.} Per gli agenti più sofisticati
-        (Vera ed AllyCare) viene utilizzato il \emph{Google Agent
+  \item \textbf{Orchestrazione di agenti.} Viene utilizzato il \emph{Google Agent
         Development Kit}~(ADK)~\cite{google_adk_docs}, una libreria
         ufficiale che astrae la gestione della sessione, l'invocazione
         ciclica del modello e l'integrazione di \emph{tool} basati su
-        \emph{function calling}. Per CooPolicy e per la variante Gemini
-        di SysAid si è preferita l'invocazione diretta dell'SDK
-        \texttt{vertexai.generative\_models}, dove un controllo
-        granulare sul ciclo di chiamate vale di più dell'astrazione
-        offerta da ADK. La scelta evita di assumere una dipendenza
-        comune (LangChain~\cite{langchain_docs} o
-        LlamaIndex~\cite{llamaindex_docs}) che vincolerebbe l'evoluzione
-        a una sola comunità.
-  \item \textbf{Infrastruttura.} Ogni componente è un servizio
+        \emph{function calling}. 
+ \item \textbf{Infrastruttura.} Ogni componente è un servizio
         serverless eseguito su Google Cloud Run~\cite{gcp_cloudrun},
         descritto interamente da codice Terraform~\cite{terraform_docs}.
 \end{itemize}
@@ -91,9 +82,8 @@ infrastrutturali a basso valore aggiunto.
 
 Il codice sorgente dell'intera suite vive in un unico monorepo Bitbucket,
 suddiviso in directory autoconsistenti, una per servizio. Ogni directory
-contiene il proprio \texttt{Dockerfile}, le proprie dipendenze, il proprio
-file di descrizione della pipeline (\texttt{cloudbuild.yaml}) e, dove
-necessario, una piccola suite di test.
+contiene il proprio \texttt{Dockerfile}, le proprie dipendenze e il proprio
+file di descrizione della pipeline (\texttt{cloudbuild.yaml}).
 
 \begin{figure}[h]
   \centering
@@ -282,10 +272,7 @@ Cap.~\ref{chap:agenti-architettura}.
 \label{sec:agenti-vera-impl}
 % =====================================================================
 
-Vera è il backend più articolato della suite e l'unico che nasce da una
-codebase pre-esistente, gradualmente refattorizzata in moduli verticali
-(\texttt{api/}, \texttt{services/}, \texttt{adk/}, \texttt{models/},
-\texttt{schemas/}, \texttt{core/}). Le scelte realizzative significative
+Vera è il backend più articolato; le scelte realizzative significative
 ruotano attorno a quattro problemi: \emph{routing} del modello, \emph{streaming}
 SSE robusto, \emph{Web grounding} con citazioni inline, gestione dei documenti
 caricati dall'utente.
@@ -293,10 +280,7 @@ caricati dall'utente.
 \subsection{Routing del modello: badge e complessità della query}
 \label{subsec:vera-routing}
 
-La selezione del modello è governata dal modulo \texttt{model\_router.py} con
-una logica a due livelli. Il primo livello deriva dal badge: Bronze è limitato
-a Gemini~2.5 Flash, Gold ha accesso esclusivo a Gemini~2.5 Pro, Silver è in
-\emph{tier} intermedio. Il secondo livello, attivo solo per Silver, valuta
+La selezione del modello è governata dal modulo \texttt{model\_router.py}:valuta
 euristicamente la complessità della richiesta sommando tre indicatori
 (lunghezza superiore a 500~caratteri, presenza di parole-chiave riconducibili
 ad analisi articolate, presenza di più punti interrogativi) e instrada verso
@@ -395,8 +379,7 @@ Cap.~\ref{chap:agenti-architettura}, Sez.~\ref{subsec:vera-caso-uso}.
 CooPolicy è la realizzazione ``RAG-native'' della suite: tutto il backend
 ruota attorno alla pipeline di Retrieval-Augmented
 Generation~\cite{lewis2020rag}, con scelte mirate a comprimere il rumore di
-recupero, ad ancorare la generazione esclusivamente al materiale recuperato e
-a rispettare le ACL aziendali sui documenti.
+recupero e ad ancorare la generazione esclusivamente al materiale recuperato.
 
 \subsection{Multi-corpus e classificazione della query}
 \label{subsec:coopolicy-multicorpus}
@@ -412,7 +395,7 @@ Vertex AI~\cite{gcp_vertex_rag} tematici (\texttt{policy-hr},
 italiano del dominio coperto. La motivazione è duplice: da un lato la
 qualità del retrieval cala rapidamente al crescere della cardinalità dei
 chunk indicizzati nello stesso spazio vettoriale; dall'altro, alcune
-classi di documenti hanno regole di accesso o di interpretazione
+classi di documenti hanno regole di interpretazione
 specifiche (i contratti collettivi vincolano la risposta in modo diverso
 dalle policy aziendali) e mantenerle separate facilita l'evoluzione
 indipendente.
@@ -425,11 +408,7 @@ motivata dalla coppia di richieste essenziale di questo passo: bassa
 latenza (sub-secondo) e basso costo unitario, condizione necessaria
 perché il classificatore venga invocato a ogni richiesta senza pesare
 sull'economia del sistema. Il prompt include il descrittore di ciascun
-corpus disponibile e due regole-guida specifiche per il dominio coop
-(domande su indennità di livello impongono il corpus contratti, domande
-su nomi propri o organigrammi impongono il corpus governance), che
-correggono ex ante errori di classificazione osservati durante la fase di
-\emph{tuning}.
+corpus disponibile.
 
 \subsection{Retrieval ibrido e soglia di rilevanza}
 \label{subsec:coopolicy-retrieval}
@@ -452,7 +431,7 @@ I chunk restituiti sono filtrati con una soglia
 \texttt{RAG\_SCORE\_THRESHOLD~=~0.15} sulla distanza coseno: il valore è
 deliberatamente permissivo, in coerenza con la decisione di delegare al
 modello generativo (vincolato dal \emph{system prompt}) la decisione su
-quali chunk siano effettivamente utili. Il rationale è che un modello in
+quali chunk siano effettivamente utili. L'aspettativa è che un modello in
 modalità a bassa temperatura (Sez.~\ref{subsec:coopolicy-generation})
 sa rifiutare contesto irrilevante, mentre una soglia troppo restrittiva
 rischia di escludere materiale marginalmente rilevante che però contiene
@@ -507,7 +486,7 @@ in ordine di prima comparsa, in modo che la lista delle fonti
 restituita al frontend rispecchi l'ordine di lettura. Per ciascuna
 citazione viene anche estratto uno \emph{snippet} di 300~caratteri
 centrato sulle keyword della query, utile per la \emph{preview} nel
-pannello laterale del frontend.
+frontend.
 
 \subsection{ACL e proxy autenticato per i documenti}
 \label{subsec:coopolicy-acl}
@@ -740,10 +719,7 @@ Una nota architetturale non banale è la differenza di regione GCP fra le
 due varianti: Gemini è disponibile in \texttt{europe-west8}, mentre
 Claude Sonnet su Vertex è offerto al momento solo in
 \texttt{europe-west1}. Entrambe le regioni si trovano nel perimetro
-europeo e soddisfano il requisito di sovranità del dato, ma l'asimmetria
-ha conseguenze pratiche (latenza media leggermente più alta per Sonnet
-da Bologna, configurazioni Terraform separate) che i deploy futuri di
-nuovi agenti dovranno tenere in considerazione.
+europeo e soddisfano il requisito di sovranità del dato.
 
 \subsection{Variante Gemini: \emph{function calling} nativo}
 \label{subsec:sysaid-gemini}

@@ -47,7 +47,9 @@ stabiliti prima di avviare lo sviluppo e mantenuti durante tutte le fasi success
     Spesso questo comporta il rischio di una dipendenza (vendor lock-in) più o meno rilevante: ad esempio, le soluzioni "out of the box" risultano di difficile trasposizione verso realtà infrastrutturali
     diverse da quelle del fornitore. Inoltre spesso sono richiesti piani di abbonamento o sottoscrizioni che possono comportare costi fissi elevati anche in caso di effettivo inutilizzo dello strumento.
     La soluzione proposta si prefigge di essere completamente portabile e facilmente adattabile verso qualunque architettura cloud o on-premises, e inoltre vuole attuare un controllo attivo dei costi, stanziando
-    periodicamente un budget di utilizzo definito dagli amministratori ("token") per ogni utente, così da garantire la sostenibilità del progetto.
+    periodicamente un budget di utilizzo definito dagli amministratori ("token") per ogni utente, istituendo dei "cluster" di disponibilità a seconda
+    delle necessità, così da garantire la sostenibilità del progetto.
+    Ovunque possibile deve essere implementato un "routing" che indirizzi verso modelli più semplici ed economici le richieste a bassa complessità.
 
   \item[Sovranità del dato]
     Nessun dato deve lasciare il perimetro cloud europeo, in conformità al Regolamento Generale sulla Protezione dei Dati (GDPR).
@@ -207,7 +209,7 @@ quindi rimandato alla fase successiva, quando ogni agente aveva
 raggiunto un livello di maturità sufficiente per essere integrato.
 Questa scelta è la genesi di Orion.
 
-\paragraph{Fine-tuning di un modello proprietario.}
+\paragraph{Fine-tuning o training di un modello proprietario.}
 Un'alternativa esplorata nella fase di analisi iniziale era addestrare
 un modello sui dati interni della cooperativa, per creare un LLM
 specializzato sul dominio aziendale. Questa opzione è stata scartata

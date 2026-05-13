@@ -88,25 +88,23 @@ file di descrizione della pipeline (\texttt{cloudbuild.yaml}).
 \begin{figure}[h]
   \centering
   \begin{lstlisting}[language=bash]
-c30-ai-agents/
-  vera-backend/         # Vera (FastAPI + ADK + Gemini)
-  vera-frontend/
-  docs-backend/         # CooPolicy (FastAPI + Vertex AI RAG Engine)
-  nps-backend/          # AllyCare (FastAPI + ADK + Gemini + BigQuery)
-  nps-frontend/
-  sysaid-backend/       # SysAid Gemini (FastAPI + Vertex AI)
-  sysaid-sonnet-backend/# SysAid Claude (FastAPI + Anthropic SDK)
-  sysaid-frontend/
-  portal-frontend/      # Portale unico di accesso (MSAL)
-  admin-backend/        # Pannello amministrativo
-  admin-frontend/
-  iac-infrastructure/   # Terraform + Cloud Build
-  ai-dev-documents/     # Documentazione architetturale
+bitbucket/c30-ai-agents/
+  vera-backend/         # Repo Vera Backend (FastAPI + ADK + Gemini)
+  vera-frontend/        # Repo Vera Frontend
+  docs-backend/         # Repo CooPolicy Backend (FastAPI + ADK + RAG)
+  nps-backend/          # Repo AllyCare Backend (FastAPI + ADK + BigQuery)
+  nps-frontend/         # Repo AllyCare Frontend
+  sysaid-backend/       # Repo SysAid Gemini Backend (FastAPI + ADK)
+  sysaid-sonnet-backend/# Repo SysAid Claude Backend (FastAPI + ADK)
+  sysaid-frontend/      # Repo SysAid Frontend
+  portal-frontend/      # Repo Portale unico di accesso (MSAL)
+  admin-backend/        # Repo Pannello amministrativo Backend
+  admin-frontend/       # Repo Pannello amministrativo Frontend
+  iac-infrastructure/   # Repo Terraform per infrastruttura
+  ai-dev-documents/     # Repo Documentazione architetturale
   \end{lstlisting}
-  \caption[Struttura del monorepo]{Struttura del monorepo. Ogni servizio è una
-  unit\`a di deploy autonoma; \texttt{iac-infrastructure} descrive l'ambiente
-  GCP nella sua interezza.}
-  \label{fig:monorepo_tree}
+  \caption[Struttura dei repository]{Elenco dei repository principali della suite. Ogni servizio è un progetto Git autonomo con proprio ciclo di CI/CD e branch per ambiente.}
+  \label{fig:multirepo_tree}
 \end{figure}
 
 I backend più maturi (Vera e Admin) adottano una separazione interna per
@@ -177,6 +175,14 @@ dell'immagine attiva del relativo servizio Cloud Run. Per l'ambiente di
 produzione, il \emph{trigger} ha \texttt{approval\_required = true}, che
 implementa lo step approvativo richiesto dal principio di
 \emph{Automazione dei rilasci} (Cap.~\ref{chap:agenti-architettura}).
+
+% [FIGURA 4.2] Pipeline CI/CD (Cloud Build -> Artifact Registry -> Cloud Run).
+% \begin{figure}[htbp]
+%     \centering
+%     \includegraphics[width=0.9\textwidth]{fig04_cicd_pipeline.pdf}
+%     \caption[Pipeline CI/CD con Cloud Build]{Schema della pipeline di Continuous Integration e Continuous Deployment per gli agenti della suite. Ad ogni \emph{push} sui branch designati, Cloud Build compila il container e lo rilascia su Cloud Run.}
+%     \label{fig:cicd_pipeline}
+% \end{figure}
 
 \subsection{Identità, autenticazione e autorizzazione}
 \label{subsec:agenti-auth}
@@ -267,6 +273,14 @@ consumo effettivo viene contabilizzato. Questo è il meccanismo concreto che
 realizza il principio di \emph{Implementazione sostenibile} del
 Cap.~\ref{chap:agenti-architettura}.
 
+% [FIGURA 4.3] Catena di sicurezza pre-generazione (DLP + Model Armor).
+% \begin{figure}[htbp]
+%     \centering
+%     \includegraphics[width=0.9\textwidth]{fig04_security_chain.pdf}
+%     \caption[Catena di sicurezza pre e post generazione]{La catena di sicurezza che ogni richiesta attraversa prima di raggiungere il modello e prima di essere restituita all'utente, integrata con Model Armor e Sensitive Data Protection.}
+%     \label{fig:security_chain}
+% \end{figure}
+
 % =====================================================================
 \section{Vera --- backend e frontend}
 \label{sec:agenti-vera-impl}
@@ -277,26 +291,22 @@ ruotano attorno a quattro problemi: \emph{routing} del modello, \emph{streaming}
 SSE robusto, \emph{Web grounding} con citazioni inline, gestione dei documenti
 caricati dall'utente.
 
-\subsection{Routing del modello: badge e complessità della query}
+\subsection{Routing del modello basato sulla complessità della query}
 \label{subsec:vera-routing}
 
-La selezione del modello è governata dal modulo \texttt{model\_router.py}:valuta
-euristicamente la complessità della richiesta sommando tre indicatori
-(lunghezza superiore a 500~caratteri, presenza di parole-chiave riconducibili
-ad analisi articolate, presenza di più punti interrogativi) e instrada verso
-Pro se almeno due indicatori sono positivi. Se nel database è configurato un
-mapping esplicito badge--modello (tabella \texttt{badge\_model\_access}), la
-logica DB ha precedenza sull'euristica, in modo che gli amministratori
-possano modificare il comportamento senza un nuovo deploy. La scelta di
-mantenere il \emph{fallback} euristico anche in presenza della tabella DB ha
-un costo di poche righe di codice e mette al riparo il sistema da
-configurazioni vuote in ambienti freschi.
+La selezione del modello è governata dinamicamente dal modulo \texttt{model\_router.py}: esso valuta
+euristicamente la complessità della richiesta sommando una serie di indicatori
+(lunghezza del prompt, presenza di parole-chiave riconducibili ad analisi articolate, struttura della domanda) 
+e instrada costantemente verso il modello più opportuno (es. da Flash a Pro o Sonnet) all'aumentare 
+della complessità. A differenza di implementazioni più rigide, il livello di abbonamento o "badge" (Bronze, Silver, Gold) 
+attribuito all'utente non interferisce mai sulla scelta del modello, ma agisce unicamente
+come limite al \emph{budget di token} consumabili mensilmente.
 
-Questa logica realizza in forma essenziale, e per uso interno al singolo
+Questa logica realizza in forma robusta, e per uso interno al singolo
 agente, il \emph{cost-quality trade-off} formalizzato dalla letteratura sul
 \emph{LLM routing}~\cite{chen2023frugalgpt,ong2024routellm}: un modello più
-piccolo è preferito quando è sufficiente, un modello più grande è impiegato
-solo quando la query lo giustifica.
+piccolo ed economico è sempre preferito quando è sufficiente, mentre un modello più grande è impiegato
+solo quando l'effettiva complessità della query lo giustifica, garantendo sostenibilità economica e massima qualità per tutti gli utenti, a prescindere dal loro budget.
 
 \subsection{Streaming SSE con sessioni dedicate e keepalive ticker}
 \label{subsec:vera-sse}
@@ -721,59 +731,42 @@ Claude Sonnet su Vertex è offerto al momento solo in
 \texttt{europe-west1}. Entrambe le regioni si trovano nel perimetro
 europeo e soddisfano il requisito di sovranità del dato.
 
-\subsection{Variante Gemini: \emph{function calling} nativo}
+\subsection{Variante Gemini: integrazione ADK nativa}
 \label{subsec:sysaid-gemini}
 
-La variante \texttt{sysaid-backend} dichiara i tre tool con
-\texttt{FunctionDeclaration} di \texttt{vertexai.generative\_models},
-li raggruppa in un oggetto \texttt{Tool} e li passa al
-\texttt{GenerativeModel} insieme a \texttt{GENERATION\_CONFIG = \{
-"temperature": 0 \}}. Il \emph{loop} di ragionamento è scritto a mano:
-ad ogni risposta del modello, il backend ispeziona le \texttt{parts} alla
-ricerca di \texttt{function\_call}, esegue la funzione corrispondente,
-costruisce un \texttt{Part.from\_function\_response} con il risultato e
-lo aggiunge all'history per il turno successivo, fino a un cap di
-\texttt{MAX\_REASONING\_STEPS = 20} iterazioni. La temperatura zero,
-in continuità con CooPolicy e con la letteratura sulla
+La variante \texttt{sysaid-backend} utilizza appieno il \emph{Google Agent Development Kit} (ADK)
+per l'astrazione del modello e l'orchestrazione del \emph{function calling}. I tool sono 
+registrati nativamente tramite i decoratori e le classi fornite dall'SDK, 
+delegando all'\emph{agentic loop} di ADK la gestione del ciclo Reason-Act-Observe.
+Il modello è configurato con \texttt{temperature = 0},
+che, in continuità con CooPolicy e con la letteratura sulla
 calibrazione~\cite{kadavath2022knowsknows}, riduce la varianza
-dell'output e rende riproducibile il comportamento del modello su query
-identiche.
+dell'output e rende riproducibile il comportamento su query
+identiche. L'adozione di ADK semplifica enormemente il codice di base, permettendo di 
+concentrarsi sulla logica di business.
 
-\subsection{Variante Sonnet: \emph{thin adapter} per Anthropic}
+\subsection{Variante Sonnet: astrazione tramite ADK e adapter}
 \label{subsec:sysaid-sonnet}
 
 La variante \texttt{sysaid-sonnet-backend} accede a Claude Sonnet
-attraverso \texttt{AnthropicVertex}, l'integrazione che permette di
-chiamare i modelli Anthropic mantenendo l'autenticazione e la fatturazione
-all'interno del progetto GCP~\cite{anthropic_docs}. L'API Anthropic
-attende una semantica diversa per i tool e per l'history dei messaggi
-rispetto a Vertex AI nativo, e questo richiede l'introduzione di un
-\emph{thin adapter} che si fa carico delle differenze.
+sempre sfruttando l'architettura ADK, ma instradando le chiamate verso \texttt{AnthropicVertex}, 
+l'integrazione che permette di chiamare i modelli Anthropic mantenendo l'autenticazione 
+e la fatturazione all'interno del progetto GCP~\cite{anthropic_docs}. Poiché le API di Anthropic 
+e i formati di tool calling differiscono parzialmente dallo standard Gemini, 
+l'implementazione fa uso di un \emph{thin adapter} all'interno del framework ADK 
+per uniformare la semantica.
 
-\paragraph{Definizione dei tool.} Mentre Gemini accetta
-\texttt{FunctionDeclaration} con \texttt{parameters} in formato
-proprietario, Anthropic richiede una lista di oggetti con campi
-\texttt{name}, \texttt{description} e \texttt{input\_schema} in
-JSON~Schema standard. La lista \texttt{SYSAID\_TOOLS} è quindi
-duplicata in JSON~Schema; il sotto-insieme \texttt{SYSAID\_TOOLS\_REPORT}
+\paragraph{Definizione dei tool.} I tool rimangono concettualmente identici e 
+vengono traslati nel formato JSON~Schema richiesto da Claude. Il sotto-insieme \texttt{SYSAID\_TOOLS\_REPORT}
 omette \texttt{generate\_chart} ed è impiegato dall'endpoint di report
-giornalieri (cfr. canale WhatsApp), che non può rendere immagini.
+giornalieri (cfr. canale WhatsApp), che non può renderizzare immagini.
 
-\paragraph{Loop a tool e \texttt{stop\_reason}.} Anthropic comunica
-l'invocazione di un tool interrompendo la generazione con
-\texttt{stop\_reason = "tool\_use"}. La risposta contiene blocchi
-tipizzati, fra cui zero o più \texttt{tool\_use} con \texttt{id},
-\texttt{name} e \texttt{input}. Il loop ripete fino a venti iterazioni:
-per ciascun blocco \texttt{tool\_use} esegue la funzione corrispondente,
-serializza il risultato in un blocco \texttt{tool\_result} con lo stesso
-\texttt{tool\_use\_id} e lo accoda come messaggio \emph{user}, prima di
-richiamare il modello. Quando \texttt{stop\_reason} è \texttt{end\_turn}
-e nessun tool è stato invocato in tutto il turno, un \emph{guardrail}
-specifico verifica che la sezione \texttt{\#\#\# RISPOSTA} non sia
-presente: se lo è, il modello ha tentato di rispondere senza chiamare
-\texttt{run\_sql}, e il backend forza un retry con un messaggio di
-correzione. È il riflesso anti-allucinazione del prompt, applicato lato
-controller invece che lato modello.
+\paragraph{Ciclo e \texttt{stop\_reason}.} L'agentic loop di ADK si adatta per interpretare 
+lo \texttt{stop\_reason = "tool\_use"} caratteristico di Anthropic. 
+L'esecuzione del loop rimane gestita centralmente, garantendo lo stesso limite di iterazioni 
+e lo stesso approccio strutturato visto nella variante Gemini. Quando il tool loop termina, 
+un \emph{guardrail} specifico verifica la corretta conformità del Markdown di output, forzando 
+se necessario un retry automatico del modello in caso di fallimenti semantici o assenza di esecuzione SQL.
 
 \paragraph{Serializzazione dei content block.} L'SDK Anthropic
 restituisce content block che includono campi interni
@@ -835,6 +828,30 @@ con Orion. La tabella \texttt{chat\_logs} (popolata da Vera, replicata
 con piccole variazioni dagli altri agenti) e i log strutturati di
 \texttt{security\_logger} costituiscono il fondamento dello stesso
 \emph{audit trail} che, una volta arricchito con il record di
+\texttt{orion\_routing\_logs} (Cap.~\ref{chap:orion-implementazione}),
+abiliterà la dashboard \emph{RouterMetrics} per la valutazione
+sperimentale della Sez.~\ref{chap:orion-valutazione}. Nessun nuovo
+servizio sarà perciò necessario per ospitare la telemetria
+dell'orchestratore.
+à perciò necessario per ospitare la telemetria
+dell'orchestratore.
+ta da Vera, replicata
+con piccole variazioni dagli altri agenti) e i log strutturati di
+\texttt{security\_logger} costituiscono il fondamento dello stesso
+\emph{audit trail} che, una volta arricchito con il record di
+\texttt{orion\_routing\_logs} (Cap.~\ref{chap:orion-implementazione}),
+abiliterà la dashboard \emph{RouterMetrics} per la valutazione
+sperimentale della Sez.~\ref{chap:orion-valutazione}. Nessun nuovo
+servizio sarà perciò necessario per ospitare la telemetria
+dell'orchestratore.
+security\_logger} costituiscono il fondamento dello stesso
+\emph{audit trail} che, una volta arricchito con il record di
+\texttt{orion\_routing\_logs} (Cap.~\ref{chap:orion-implementazione}),
+abiliterà la dashboard \emph{RouterMetrics} per la valutazione
+sperimentale della Sez.~\ref{chap:orion-valutazione}. Nessun nuovo
+servizio sarà perciò necessario per ospitare la telemetria
+dell'orchestratore.
+ricchito con il record di
 \texttt{orion\_routing\_logs} (Cap.~\ref{chap:orion-implementazione}),
 abiliterà la dashboard \emph{RouterMetrics} per la valutazione
 sperimentale della Sez.~\ref{chap:orion-valutazione}. Nessun nuovo

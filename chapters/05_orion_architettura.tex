@@ -49,7 +49,7 @@
 \label{subsec:orion-output-strutturato}
 % TODO — Schema dell'output del router (ricavato da ORION_ROADMAP.md):
 %   {
-%     "agent": "self | sysaid_gemini | sysaid_sonnet | allycare | coopolicy",
+%     "agent": "self | sysaid | allycare | coopolicy",
 %     "complexity": "low | medium | high",
 %     "confidence": 0.0..1.0,
 %     "reasoning": "Chain of Thought esplicita",
@@ -57,9 +57,9 @@
 %   }
 %
 % Motivazioni:
-% - "agent": classificazione di intento -> selezione dell'agente.
-% - "complexity": passata as-is ai sub-agenti per il loro routing
-%   modello interno (es. sysaid: low -> Flash, high -> Pro/Sonnet).
+% - "agent": classificazione di intento -> selezione del dominio dell'agente.
+% - "complexity": usata internamente da Orion per instradare a varianti specifiche 
+%   (es. sysaid: low -> Flash, high -> Sonnet).
 % - "confidence": calibrazione del routing (Cap. 7).
 % - "reasoning": Chain-of-Thought \cite{wei2022cot} -> migliore
 %   accuracy + tracciabilita' delle decisioni.

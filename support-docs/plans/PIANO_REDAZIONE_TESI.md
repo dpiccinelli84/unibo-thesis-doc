@@ -16,8 +16,7 @@ La tesi tratta **4 agenti** verticali (non 6):
 2. **CooPolicy** — RAG su corpus di policy aziendali condiviso
 3. **AllyCare / NPS** — Text-to-SQL su BigQuery (sondaggi NPS)
 4. **SysAid** — Text-to-SQL su BigQuery (ticketing), in **doppia variante**
-   Gemini 2.5 vs Claude Sonnet 4.6, trattata come confronto multi-modello
-   *interno* al capitolo (non come 5° agente).
+   Gemini 2.5 vs Claude Sonnet 4.6, trattata come target per il routing su complessità di Orion.
 
 **Esclusi** dalla tesi:
 - *Personal Docs* (RAG per-utente): non instradato da Orion nel
@@ -213,3 +212,4 @@ File: `bibliography.bib` (BibTeX) + `letteratura-complessiva.md`
 - Documenti tesi precedenti: `/home/dave/workspace/github/unibo/prova-finale/`
   (`bozza-tesi.md`, `elenco-capitoli.md`, `bibliografia.md`)
 - Codice della suite: `/home/dave/workspace/bitbucket/c30-ai-agents/`
+pace/bitbucket/c30-ai-agents/`

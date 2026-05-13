@@ -33,29 +33,28 @@ Utente → [Frontend Orion]
               │   Output: { agent, complexity, confidence, clarification_needed }
               │
               ├─ agent == "self"          → pipeline Vera (RAG + search + generation)
-              ├─ agent == "sysaid_gemini" → HTTP proxy → sysaid-backend
-              ├─ agent == "sysaid_sonnet" → HTTP proxy → sysaid-sonnet-backend
+              ├─ agent == "sysaid" (low comp.)  → HTTP proxy → sysaid-backend (Gemini Flash)
+              ├─ agent == "sysaid" (high comp.) → HTTP proxy → sysaid-sonnet-backend (Claude Sonnet)
               ├─ agent == "allycare"      → HTTP proxy → nps-backend
               └─ agent == "coopolicy"     → HTTP proxy → docs-backend
 ```
 
 **Principi di design:**
-- I backend degli agenti specializzati **non vengono modificati** — tutta la logica di adattamento sta nel proxy di Orion.
+- I backend degli agenti specializzati (sviluppati in repository separati) **non vengono modificati** — tutta la logica di adattamento sta nel proxy di Orion.
 - Il token Entra ID dell'utente viene forwardato as-is ai sub-agenti.
 - Orion gestisce la propria storia di conversazione (tutti i turni, tutti gli agenti).
-- La stima di complessità viene passata ai sub-agenti come campo opzionale non-breaking.
+- La stima di complessità viene valutata dal router e usata per selezionare il modello target (es. smistamento su SysAid).
 
 ---
 
 ## 2. Fase 1 — Backend Orion
 
-**Base:** fork di `vera-backend`. Si eredita tutto; si aggiungono 2 moduli e si modifica il chat endpoint.
+**Base:** nuovo progetto basato sui pattern ADK degli altri agenti. Si eredita la base; si aggiungono 2 moduli e si modifica il chat endpoint.
 
 ### Step 1.1 — Setup repository e struttura
 
-- [ ] Creare directory `orion-backend/` nella repo mono
-- [ ] Copiare `vera-backend/` come base
-- [ ] Rinominare riferimenti interni da "vera" a "orion" (app name, API prefix `/api/orion`, log labels)
+- [ ] Inizializzare un nuovo repository o configurare l'ambiente per `orion-backend`
+- [ ] Recuperare lo strato condiviso FastAPI / ADK usato dagli altri agenti
 - [ ] Aggiornare `requirements.txt` con eventuali dipendenze aggiuntive (`httpx` per il proxy HTTP)
 
 ### Step 1.2 — Router Agent (`app/agents/router_agent.py`)

@@ -1,0 +1,441 @@
+% !TEX root = ../main.tex
+% =====================================================================
+% CAPITOLO 7 — VALUTAZIONE
+% =====================================================================
+
+\chapter{Valutazione}
+\label{chap:orion-valutazione}
+
+Questo capitolo presenta la valutazione sperimentale del sistema su tre piani complementari. 
+Il primo, e più esteso, è il terzo contributo della tesi: una metodologia di valutazione del routing di Orion tramite uno strumento di esecuzione automatica integrato nell'admin panel, 
+progettata per misurare in modo sistematico e ripetibile l'accuratezza delle decisioni dell'orchestratore e per guidare il miglioramento del \emph{system prompt} del router; 
+i risultati su due versioni successive del prompt (v1.0 e v1.1) ne illustrano sia l'utilità sia i limiti. 
+
+Il secondo piano (Sez.~\ref{sec:eval-agenti}) valuta la \emph{qualità dei sub-agenti}: execution accuracy per gli agenti Text-to-SQL e faithfulness per il RAG, 
+applicando le metodologie introdotte nel background (Sez.~\ref{subsec:bg-text2sql} e~\ref{sec:bg-ragas}). 
+
+Il terzo (Sez.~\ref{sec:eval-costi}) propone una valutazione economica indicativa del costo di implementazione del progetto rispetto
+all'adozione di licenze SaaS.
+
+% =====================================================================
+\section{Domande di ricerca}
+\label{sec:eval-research-questions}
+% =====================================================================
+
+La valutazione è guidata da cinque domande di ricerca:
+
+\begin{description}
+  \item[RQ1] Quanto è accurato il routing dell'orchestratore? (\emph{Agent Accuracy})
+  \item[RQ2] Quanto è accurata la stima di complessità? (\emph{Complexity Accuracy})
+  \item[RQ3] Il confidence score è calibrato? È più alto sui casi corretti che su quelli errati?
+  \item[RQ4] Il meccanismo di clarification riduce l'errore senza degradare l'esperienza utente?
+  \item[RQ5] Iterazioni successive del system prompt migliorano le metriche in modo misurabile?
+\end{description}
+
+La metodologia adottata combina elementi dell'approccio \emph{AgentBench}~\cite{liu2023agentbench}
+per la valutazione di agenti LLM con il paradigma del prompt engineering iterativo~\cite{sahoo2024prompteng_survey}:
+un gold standard fisso, un'esecuzione automatica, metriche dichiarate a priori, iterazione controllata del prompt con confronto quantitativo.
+
+% =====================================================================
+\section{Metodologia di valutazione}
+\label{sec:eval-metodologia}
+% =====================================================================
+
+\subsection{Costruzione del gold standard}
+\label{subsec:eval-gold-standard}
+
+La test suite è composta da 120 test case, ciascuno definito da un prompt in linguaggio naturale, 
+un agente atteso (\texttt{self}, \texttt{sysaid}, \texttt{allycare}, \texttt{coopolicy}), una complessità attesa (\texttt{low} o \texttt{high}) e una categoria tematica.
+
+La costruzione è avvenuta in tre fasi:
+
+\begin{enumerate}
+  \item \textbf{Campionamento da log reali.} I prompt più frequenti nelle conversazioni di ciascun agente (raccolti durante la fase di test della suite) 
+  sono stati anonimizzati e riformulati per eliminare riferimenti personali. 
+  Questa fase ha prodotto circa 80~prompt rappresentativi del traffico effettivo.
+
+  \item \textbf{Prompt sintetici per casi limite.} Sono stati creati manualmente circa 30~prompt progettati per esplorare le zone di ambiguità: 
+  sovrapposizioni tra SysAid e AllyCare, tra Orion e CooPolicy (domande che potrebbero essere sia generiche sia documentali), 
+  e richieste deliberatamente fuori dominio.
+
+  \item \textbf{Prompt di sicurezza.} Un sottoinsieme di 10~prompt testa il comportamento del router su richieste malevole (prompt injection, richieste di dati personali) 
+  per verificare che vengano gestite dalla pipeline di sicurezza.
+\end{enumerate}
+
+Le categorie tematiche sono cinque: \emph{SysAid} (36~casi), \emph{NPS} (21~casi), \emph{Policy} (33~casi), \emph{General} (23~casi) e \emph{Ambiguous} (7~casi).
+La distribuzione riflette approssimativamente il volume di traffico atteso, con un \emph{oversampling} deliberato della categoria \emph{Ambiguous} per testare il meccanismo di clarification.
+
+I test case sono raccolti in un file CSV (\texttt{test\_suite\_orion.csv}) e importati nel database dell'admin panel attraverso la pagina \emph{Eval Routing} (cfr. Sez.~\ref{subsec:orion-impl-eval}). 
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{eval1}
+    \caption[Estratto della test suite]{La test suite di valutazione nel tab ``Test Suite'' dell'admin panel di Orion: i 120 prompt etichettati con agente atteso, 
+    complessità attesa e categoria tematica, importabili da CSV.}
+    \label{fig:test_suite}
+\end{figure}
+
+\subsection{Architettura del framework di valutazione}
+\label{subsec:eval-admin-page}
+
+La valutazione avviene interamente dall'admin panel di Orion, senza necessità di script CLI esterni o accesso diretto all'infrastruttura di Cooperativa. 
+
+\paragraph{Backend (\texttt{eval.py}).} Cinque endpoint REST esposti sotto il prefisso \texttt{/api/\allowbreak orion-admin/\allowbreak eval/}:
+
+\begin{itemize}
+  \item \texttt{GET /test-suite}: restituisce i test case attivi dal database.
+  \item \texttt{POST /test-suite/import}: importa i test case da un contenuto CSV, sovrascrivendo i precedenti.
+  \item \texttt{POST /run}: esegue la valutazione. Per ciascun test case, il backend chiama la funzione \texttt{classify()} \emph{direttamente} (invocazione Python, nessuna chiamata HTTP), 
+  confronta l'output con l'atteso, salva il risultato nel database e costruisce il summary.
+  \item \texttt{GET /runs}: restituisce la lista delle run passate con metriche aggregate.
+  \item \texttt{GET /runs/\{run\_id\}}: restituisce il dettaglio completo di una run specifica.
+\end{itemize}
+
+L'invocazione diretta della funzione \texttt{classify()} è molto conveniente: 
+il backend admin (\texttt{orion-admin-backend}) include una copia del modulo \texttt{router\_agent.py}, 
+rendendo possibile l'import Python diretto senza la necessità di chiamare l'endpoint \texttt{/classify} del backend utente. 
+
+Ogni test case costa una sola chiamata a Gemini Flash ($\sim$0,5~secondi); una run completa di 120~test case richiede circa 60~secondi.
+
+\paragraph{Frontend (\texttt{Eval.tsx}).} Una pagina React organizzata in tre tab (\emph{Test Suite}, \emph{Lancia Eval}, \emph{Storico Run}) 
+che integra l'intero ciclo di valutazione in un'unica interfaccia. Il tab \emph{Lancia Eval} visualizza i risultati con KPI card codificate cromaticamente 
+(verde se il target è raggiunto, rosso altrimenti), breakdown per agente con barre orizzontali, 
+lista dei casi errati espandibile con il reasoning del router, e tabella completa dei risultati con icone di correttezza.
+
+\subsection{Metriche e target}
+\label{subsec:eval-metriche}
+
+
+\begin{table}[htbp]
+  \centering
+  \caption[Metriche di valutazione e target]{Metriche di valutazione del routing con target dichiarati a priori.}
+  \label{tab:eval-metriche}
+  \begin{tabular}{llc}
+    \toprule
+    \textbf{Metrica}                  & \textbf{Definizione}                              & \textbf{Target} \\
+    \midrule
+    Agent Accuracy                    & $\frac{\text{agente corretto}}{\text{totale}}$     & $\geq 85\%$ \\[3pt]
+    Complexity Accuracy               & $\frac{\text{complessità corretta}}{\text{totale}}$ & $\geq 80\%$ \\[3pt]
+    Clarification Rate                & $\frac{\text{clarification poste}}{\text{totale}}$  & $< 15\%$ \\[3pt]
+    Mean Confidence (correct)         & Media della confidence sui casi corretti            & $\geq 0{,}82$ \\[3pt]
+    Mean Confidence (wrong)           & Media della confidence sui casi errati              & $\leq 0{,}65$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Le ultime due metriche, prese congiuntamente, valutano la \emph{calibrazione} del confidence score~\cite{kadavath2022knowsknows}: 
+un router ben calibrato è sicuro quando ha ragione e dubbioso quando sbaglia. 
+Se le due distribuzioni di confidence (corretti vs errati) sono ben separate, la soglia di clarification può essere posizionata in modo efficace.
+
+% =====================================================================
+\section{Risultati}
+\label{sec:eval-risultati}
+% =====================================================================
+
+\subsection{Run v1.0: primo prompt}
+\label{subsec:eval-v10}
+
+La prima run di valutazione (prompt version v1.0) ha prodotto i seguenti risultati su 120~test case (Tab.~\ref{tab:eval-v10}):
+
+\begin{table}[htbp]
+  \centering
+  \caption[Risultati della run v1.0]{Risultati della run v1.0 (120 test case, primo system prompt).}
+  \label{tab:eval-v10}
+  \begin{tabular}{lcc}
+    \toprule
+    \textbf{Metrica}             & \textbf{Valore}  & \textbf{Target} \\
+    \midrule
+    Agent Accuracy               & $99{,}2\%$ (119/120) & $\geq 85\%$ \\
+    Complexity Accuracy          & $88{,}3\%$ (106/120) & $\geq 80\%$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+L'accuracy globale supera il target del $85\%$ fin dalla prima iterazione. Di seguito il breakdown per agente (Tab.~\ref{tab:eval-v10-breakdown}):
+
+\begin{table}[htbp]
+  \centering
+  \caption[Breakdown per agente --- v1.0]{Agent accuracy per agente target nella run v1.0.}
+  \label{tab:eval-v10-breakdown}
+  \begin{tabular}{lcl}
+    \toprule
+    \textbf{Agente}   & \textbf{Accuracy}     & \textbf{Note} \\
+    \midrule
+    SysAid            & 100\% (36/36)         & Perfetto \\
+    CooPolicy         & 100\% (33/33)         & Perfetto \\
+    AllyCare          & 95\% (20/21)          & Eccellente \\
+    Self (Orion)      & 100\% (30/30)         & Perfetto \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{eval2}
+    \caption[Risultati della run v1.0 nell'admin panel]{La pagina di valutazione al termine della run v1.0: le quattro KPI card 
+    (agent accuracy, complexity accuracy, confidence media sui casi corretti e sugli errati) e il breakdown per agente.}
+    \label{fig:accuracy_per_agent}
+\end{figure}
+
+\subsection{Analisi degli errori della v1.0}
+\label{subsec:eval-errori-v10}
+
+L'errore di classificazione della v1 ricade in questo pattern: 
+
+\paragraph{Pattern 1: Correlazione cross-dataset non riconosciuta (1~errore).} Il prompt ``Analizza la correlazione tra NPS e volume di vendita per punto vendita'' 
+viene instradato a \texttt{self} anziché ad \texttt{allycare}, perché il router non riconosce che i dati NPS sono necessari per l'analisi. 
+È l'unico errore, con confidence bassa (0,55), segnale che il router stesso percepiva l'incertezza.
+
+\subsection{Iterazione del prompt: v1.1}
+\label{subsec:eval-iterazione}
+
+Sulla base dell'analisi sono state apportate queste modifiche, per cercare di eliminare l'errore e migliorare la complexity accuracy:
+
+\begin{enumerate}
+  \item \textbf{Regola 8: Correlazioni cross-dataset.} Aggiunta la regola che richieste che \emph{richiedono dati} di un agente specializzato (anche se formulate in modo generico) 
+  vanno instradate a quell'agente.
+
+  \item \textbf{Complessità.} È stata modificata la classificazione per cercare di fare correttamente catalogare come ``low'' le ricerche a singola query o i confronti semplici.
+  
+\end{enumerate}
+
+La run v1.1 è stata eseguita sullo \emph{stesso} gold standard della v1.0 modificando esclusivamente il system prompt del router. La Tab.~\ref{tab:eval-v11} confronta le due run.
+
+\begin{table}[htbp]
+  \centering
+  \caption[Confronto fra le run v1.0 e v1.1]{Confronto fra le run v1.0 e v1.1 sul medesimo gold standard di 120 test case. Cambia esclusivamente il system prompt del router.}
+  \label{tab:eval-v11}
+  \begin{tabular}{lcc}
+    \toprule
+    \textbf{Metrica}                 & \textbf{v1.0} & \textbf{v1.1} \\
+    \midrule
+    Agent Accuracy                   & $99{,}2\%$      & $99{,}2\%$ \\
+    Complexity Accuracy              & $88{,}3\%$      & $93{,}3\%$ \\
+    Errori (su 120)                  & 1               & 1 \\
+    Confidence media (corretti)      & $0{,}922$       & $0{,}922$ \\
+    Confidence media (errati)        & $0{,}55$        & $0{,}5$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Il guadagno più netto è sulla \emph{complexity accuracy} ($+5{,}0$~punti percentuali): le regole aggiunte hanno reso più stabile la distinzione low/high. 
+L'\emph{agent accuracy} invece non migliora: la Regola~8 non è bastata a correggere la correlazione cross-dataset dell'errore, che ricompare a bassa confidence. 
+
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth,keepaspectratio]{eval4}
+  \caption[Risultati della run v1.1 nell'admin panel]{Risultati della run v1.1 nell'admin panel, con lo storico delle due run sul medesimo gold standard. 
+  Le KPI card e il breakdown per agente si riferiscono alla v1.1.}
+  \label{fig:eval_v11}
+\end{figure}
+
+\subsection{Calibrazione del confidence score}
+\label{subsec:eval-confidence-cal}
+
+La calibrazione del confidence score è verificata confrontando la distribuzione della confidence sui casi corretti e quella sui casi errati. 
+Un router ben calibrato presenta due distribuzioni ben separate: confidence alta sui casi corretti, confidence bassa sui casi errati.
+
+Nella run v1.0 la confidence media è risultata pari a $0{,}922$ sui casi corretti e $0{,}55$ sul caso errato;
+la seconda run l'ha ulteriormente abbassata a $0{,}5$.
+
+% =====================================================================
+\section{Discussione}
+\label{sec:eval-discussione}
+% =====================================================================
+
+\subsection{Risposte alle domande di ricerca}
+\label{subsec:eval-rq}
+
+\paragraph{RQ1 --- Agent Accuracy.} Il routing raggiunge il $99{,}2\%$ di accuracy, 
+sopra il target dell'$85\%$ in entrambe le run.
+
+\paragraph{RQ2 --- Complexity Accuracy.} La stima di complessità passa dall'$88{,}3\%$ (v1.0) al $93{,}3\%$ (v1.1), 
+restando sopra il target dell'$80\%$. È la metrica che beneficia di più dell'iterazione del prompt ($+5{,}0$~punti percentuali): 
+le regole aggiunte nella v1.1 hanno reso più stabile la distinzione low/high.
+
+\paragraph{RQ3 --- Calibrazione.} Il confidence score separa nettamente i casi corretti da quello errato:
+la confidence media sui corretti è $0{,}922$ in entrambe le run, mentre l'unico caso errato resta ben sotto la soglia di clarification ($0{,}55$ nella v1.0, $0{,}5$ nella v1.1),
+rispettando i target dichiarati a priori (Tab.~\ref{tab:eval-metriche}). Il dato va però letto con cautela: poggiando su \emph{un solo} caso errato, la ``media sugli errati'' è di fatto un valore singolo e non una statistica robusta.
+
+\paragraph{RQ4 --- Clarification.} Il clarification rate è risultato molto basso in entrambe le run: il meccanismo è funzionalmente corretto (Fig.~\ref{fig:orion_clarification}) 
+ma scatta troppo di rado per una valutazione statisticamente robusta: servirebbero più casi genuinamente ambigui (confidence 0,50--0,70) e un confidence score più discriminante.
+
+\paragraph{RQ5 --- Iterazione del prompt.} Il passaggio da v1.0 a v1.1 mostra che l'iterazione del prompt è efficace \emph{sulla complessità}: 
+però non ha inciso a sufficienza sulla correlazione cross-dataset.
+
+\subsection{Limiti dell'impianto di valutazione}
+\label{subsec:eval-limiti}
+
+È importante discutere i limiti dell'impianto sperimentale:
+
+\begin{itemize}
+  \item \textbf{Dimensione del gold standard.} 120~test case è un campione sufficiente per identificare 
+  pattern sistematici di errore ma non per produrre intervalli di confidenza stretti sulle metriche.  
+
+  \item \textbf{Bias del costruttore.} I test case sono stati costruiti dall'autore della tesi, 
+  che pur tentando di essere oggettivo, conosce le capacità e i limiti del sistema. 
+  Un gold standard costruito da utenti reali senza conoscenza del sistema interno produrrebbe prompt con distribuzione potenzialmente diversa.
+
+  \item \textbf{Dataset sintetico vs traffico reale.} I prompt del gold standard sono sintetici o derivati da log anonimizzati. 
+  Il traffico reale potrebbe contenere formulazioni, errori ortografici, cambi di lingua o richieste ibride non rappresentati nel gold standard.
+
+  \item \textbf{Non-determinismo intra-run.} Il router è configurato con \texttt{temperature = 0.1}: un valore quasi-deterministico ma non nullo. 
+  Esecuzioni ripetute dello stesso test case possono produrre classificazioni diverse, specialmente sui casi vicini al confine decisionale. 
+  Una misura della varianza intra-run ad esempio eseguendo ogni test case $N$~volte e calcolando la percentuale di concordanza quantificherebbe la stabilità del router e 
+  distinguerebbe gli errori sistematici da quelli stocastici.
+
+ \end{itemize}
+
+% =====================================================================
+\section{Valutazione della qualità degli agenti verticali}
+\label{sec:eval-agenti}
+% =====================================================================
+
+La valutazione del routing (Sez.~\ref{sec:eval-risultati}) misura se Orion sceglie l'agente \emph{giusto}, ma non se l'agente scelto risponde \emph{bene}. 
+Questa sezione colma quel divario valutando direttamente la qualità dei sub-agenti, con due metodologie distinte a seconda della forma di grounding: 
+\emph{execution accuracy} per gli agenti Text-to-SQL (SysAid, AllyCare) e \emph{faithfulness} con \emph{answer relevancy} per l'agente RAG (CooPolicy). 
+Entrambe sono applicazioni dirette delle metriche introdotte nel Capitolo~\ref{chap:background} (Sez.~\ref{subsec:bg-text2sql} e~\ref{sec:bg-ragas}).
+
+Il codice della valutazione è pubblicato nel modulo \texttt{evaluation/} del repository (Sez.~\ref{sec:concl-generalizzabilita}): 
+gli script invocano gli \emph{endpoint reali} degli agenti così che la misura sia end-to-end e non su una riproduzione parziale del sistema.
+
+\subsection{Text-to-SQL: execution accuracy}
+\label{subsec:eval-text2sql}
+
+La metrica adottata è l'\emph{execution accuracy} (o \emph{denotation accuracy}), lo standard dei benchmark Spider~\cite{yu2018spider} e 
+BIRD~\cite{li2023bird}: una query generata è corretta se, eseguita, produce lo \emph{stesso result-set} della query di riferimento (\emph{gold}), 
+indipendentemente dalla sua formulazione testuale. Rispetto al confronto sintattico fra stringhe SQL, l'execution accuracy è la misura corretta perché query 
+diverse possono essere semanticamente equivalenti.
+
+\paragraph{Protocollo.} Per ciascuna domanda di un gold standard etichettato (domanda in linguaggio naturale + query SQL di riferimento) lo script invoca l'agente sul suo 
+endpoint di produzione, estrae le query SQL effettivamente eseguite (esposte dall'agente nel campo \texttt{queries}),
+le esegue su BigQuery insieme alla gold e ne confronta i result-set in modo order-insensitive e robusto a casing e arrotondamenti. 
+Si riportano due metriche: \textbf{EX (final)}, che richiede il match con l'ultima query del turno (quella che produce la risposta finale), ed \textbf{EX (any)}, 
+che ammette il match con almeno una delle query eseguite; la distanza fra le due separa gli errori di generazione SQL dagli errori di selezione della query conclusiva.
+
+\begin{table}[htbp]
+  \centering
+  \caption[Execution accuracy degli agenti Text-to-SQL]{Execution accuracy degli agenti Text-to-SQL su un gold standard di domande etichettate con SQL di riferimento. La complessità segue la stessa distinzione low/high del routing.}
+  \label{tab:eval-text2sql}
+  \begin{tabular}{lcccc}
+    \toprule
+    \textbf{Agente} & \textbf{N} & \textbf{EX (final)} & \textbf{EX (any)} & \textbf{IC 95\% (Wilson)} \\
+    \midrule
+    AllyCare (NPS)      & 25 & 80{,}0\% & 80{,}0\% & $[60{,}9\% ,\, 91{,}1\%]$ \\
+    SysAid (ticketing)  & 25 & 84{,}0\% & 84{,}0\% & $[65{,}3\% ,\, 93{,}6\%]$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+AllyCare raggiunge un'execution accuracy dell'$80\%$ (20/25) e SysAid dell'$84\%$ (21/25), con SQL eseguibile prodotto rispettivamente in $23/25$ e $25/25$ dei casi. 
+La coincidenza fra EX (final) ed EX (any) indica che, quando l'agente sbaglia, sbaglia la query stessa e non la mera selezione di quella conclusiva. 
+Gli errori si concentrano su due classi note nella letteratura Text-to-SQL: (i)~le \emph{aggregazioni con regole di dominio implicite} come 
+il calcolo dell'NPS (formula promotori/detrattori), le medie con filtri di validità (\texttt{voto\_item >= 0}) e le percentuali per AllyCare; 
+le aggregazioni temporali per SysAid, dove l'interpretazione dell'agente diverge da quella codificata nella query gold; 
+(ii)~alcuni casi in cui l'agente risponde in modo discorsivo senza eseguire SQL. Si osserva inoltre un effetto del \emph{non-determinismo}: 
+un conteggio elementare classificato correttamente in un'esecuzione può fallire in un'altra, segnale che parte della varianza è stocastica e non sistematica 
+(cfr. Sez.~\ref{subsec:eval-limiti}). Va infine ricordato che una quota di questi disaccordi è imputabile all'etichettatura del gold standard (un solo annotatore): 
+su domande con regole di business sfumate la query di riferimento è una scelta progettuale. Gli intervalli di confidenza al $95\%$ (metodo di Wilson) sono ampi, $[60{,}9\%,\,91{,}1\%]$ per AllyCare 
+e $[65{,}3\%,\,93{,}6\%]$ per SysAid, conseguenza diretta del campione ridotto ($n=25$): i valori vanno letti come stime puntuali con incertezza non trascurabile.
+
+\subsection{RAG: faithfulness e answer relevancy}
+\label{subsec:eval-rag}
+
+Per CooPolicy si adottano due metriche del framework RAGAS~\cite{es2023ragas}, calcolate con il paradigma \emph{LLM-as-judge}~\cite{zheng2023llmjudge}: 
+la \textbf{faithfulness} (frazione delle affermazioni della risposta supportate dai frammenti recuperati, misura anti-allucinazione) e l'\textbf{answer relevancy} 
+(pertinenza della risposta alla domanda). Il gold standard distingue domande \emph{nel} corpus, su cui si misurano le due metriche e l'\emph{answer rate}, 
+da domande \emph{fuori} corpus, su cui si misura il \emph{tasso di corretto rifiuto}: per un agente vincolato al solo materiale recuperato (Sez.~\ref{subsec:coopolicy-generation}), 
+rifiutare correttamente una domanda fuori dominio è esso stesso un comportamento desiderato.
+
+\begin{table}[htbp]
+  \centering
+  \caption[Metriche RAG di CooPolicy]{Metriche di qualità del RAG di CooPolicy, calcolate con LLM-as-judge (Gemini~2.5 Pro) su un gold standard di domande in-corpus e fuori-corpus.}
+  \label{tab:eval-rag}
+  \begin{tabular}{lc}
+    \toprule
+    \textbf{Metrica} & \textbf{Valore} \\
+    \midrule
+    Faithfulness media (in-corpus)              & 0{,}73 \\
+    Answer relevancy media (in-corpus)          & 0{,}85 \\
+    Answer rate (in-corpus)                     & 100\% (20/20) \\
+    Corretto rifiuto (fuori-corpus)             & 80\% (4/5) \\
+    Citazioni sulle risposte in-corpus          & 100\% (20/20) \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+CooPolicy risponde a tutte le domande in corpus ($20/20$), sempre corredando la risposta di citazioni alle fonti, 
+e rifiuta correttamente $4$ delle $5$ domande fuori corpus: l'unico scivolone è una richiesta di traduzione, 
+a cui l'agente risponde dalla conoscenza parametrica anziché astenersi, comportamento innocuo ma formalmente fuori mandato. 
+La faithfulness media ($0{,}73$) e l'answer relevancy ($0{,}85$) indicano risposte pertinenti e in larga parte ancorate al materiale recuperato, 
+ma con \emph{varianza elevata}: diverse risposte sono pienamente fedeli (faithfulness $\geq 0{,}95$), 
+altre contengono affermazioni non supportate dagli \emph{snippet} recuperati ($< 0{,}4$). 
+Il valore va letto come stima \emph{conservativa}: il giudizio di grounding è calcolato sugli \emph{snippet} di 300~caratteri esposti dall'agente, 
+non sul documento integrale, e penalizza quindi affermazioni corrette ma supportate da porzioni di documento non incluse nello snippet.
+
+\paragraph{Limiti.} Le due valutazioni ereditano i limiti già discussi in Sez.~\ref{subsec:eval-limiti} (dimensione del gold standard, bias del costruttore) e ne aggiungono di specifici. 
+L'execution accuracy dipende dalla correttezza delle query gold, etichettate da un singolo annotatore; il giudizio di faithfulness è affidato a un LLM, 
+con i noti bias di posizione, lunghezza e auto-preferenza~\cite{zheng2023llmjudge}, e valuta il \emph{grounding} sugli snippet recuperati (300~caratteri) 
+anziché sul documento integrale. Restano dunque misure indicative, utili a stabilire un \emph{ordine di grandezza} della qualità degli agenti e una base di partenza riproducibile, 
+non un giudizio definitivo.
+
+% =====================================================================
+\section{Valutazione economica}
+\label{sec:eval-costi}
+% =====================================================================
+
+La motivazione di costo (Cap.~\ref{chap:introduzione}) merita una verifica quantitativa, sia pure indicativa:
+si costruisce un modello \emph{parametrico} con assunzioni esplicite e facilmente aggiornabili;
+il calcolatore è incluso nel modulo \texttt{evaluation/cost\_model.py}.
+L'obiettivo non è una stima contabile precisa, ma il confronto fra due modelli di costo: quello di licenze SaaS nominali per l'intera popolazione
+e quello di una piattaforma a consumo come quella realizzata.
+
+\paragraph{Assunzioni.} Si considera la popolazione di dipendenti \emph{potenzialmente abilitabili} a una licenza: in Coop Alleanza si tratta di circa $N \approx 4\,000$ figure con mansioni d'ufficio. 
+Le suite SaaS di AI generativa per l'enterprise
+(assistenti integrati nella suite di produttività o chatbot dedicati) hanno, a listino pubblico nel 2026, un prezzo dell'ordine di \texteuro20--30 per utente al mese
+\footnote{Il riferimento è ai prezzi di listino pubblici dei principali assistenti enterprise (es. \texteuro30/utente/mese per le suite di produttività integrate), 
+convertiti per omogeneità con il resto della tesi. Il valore è un parametro del modello, non un dato dell'organizzazione.}; nel modello si adotta il valore mediano di \texteuro25.
+La piattaforma realizzata, al contrario, ha un costo dominato dal consumo: chiamate ai modelli su Vertex AI,
+esecuzione serverless su Cloud Run (che scala a zero) e servizi managed di base. 
+La differenza strutturale è che il SaaS è tariffato \emph{per utente abilitato}, la piattaforma \emph{per utilizzo effettivo}, ed è proprio su questo divario
+che si fonda il vantaggio economico.
+
+Il punto cruciale è che \emph{avere accesso} a uno strumento di AI non equivale a \emph{usarlo}. I dati di adozione lo confermano: secondo Gallup~\cite{gallup2026aiwork},
+fra i lavoratori in ruoli d'ufficio (\emph{remote-capable}) solo il $40\%$ usa l'AI almeno qualche volta a settimana e il $19\%$ ogni giorno;
+The Conference Board~\cite{conferenceboard2023genai} stima un uso frequente o regolare attorno al $31\%$. Si assume quindi che la frazione di utenti realmente attivi sia compresa
+fra il $19\%$ (uso quotidiano) e il $40\%$ (uso frequente) della popolazione abilitabile, con un volume dell'ordine di $30$--$60$ richieste mensili per utente attivo.
+Il modello è \emph{robusto} rispetto alle due letture: come mostra la Tab.~\ref{tab:eval-costi}, entrambe convergono su $\sim0{,}55$~milioni di richieste l'anno
+e un costo di piattaforma di $\sim$\texteuro$30$~mila.
+
+\begin{table}[htbp]
+  \centering
+  \caption[Confronto economico a ordini di grandezza]{Confronto annuo fra licenze SaaS nominali e piattaforma a consumo, 
+  per la popolazione di $N\approx4\,000$ dipendenti abilitabili di Coop Alleanza. I valori sono parametrici (vedi \texttt{cost\_model.py}) 
+  e la frazione di utenti attivi è ancorata ai dati di adozione di Gallup~\cite{gallup2026aiwork}.}
+  \label{tab:eval-costi}
+  \small
+  \setlength{\tabcolsep}{3pt}
+  \begin{tabular}{lcr}
+    \toprule
+    \textbf{Voce} & \textbf{Parametro} & \textbf{Costo annuo (ordine)} \\
+    \midrule
+    \multicolumn{3}{l}{\emph{Scenario A --- licenze SaaS nominali}} \\
+    Licenze per intera popolazione & $N=4\,000 \times {}$\texteuro$25$/mese & $\sim{}$\texteuro$1{,}2\,$M \\
+    \midrule
+    \multicolumn{3}{l}{\emph{Scenario B --- piattaforma a consumo (realizzata)}} \\
+    Utenti realmente attivi & $19$--$40\%$ di $N$ (Gallup) & --- \\
+    Richieste/utente attivo/mese & $\sim30$--$60$ & --- \\
+    Costo medio per richiesta & $\sim{}$\texteuro$0{,}01$ (routing Flash + agente) & --- \\
+    Inferenza LLM (Vertex AI) & $\approx 0{,}55\,$M richieste/anno & $\sim{}$\texteuro$5$--$6$k \\
+    Cloud Run + Cloud SQL + base & infrastruttura managed & $\sim{}$\texteuro$25$k \\
+    \textbf{Totale piattaforma} & & $\sim{}$\texteuro$30$k \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Con assunzioni prudenti, i due scenari differiscono di circa un \emph{fattore 40} (\texteuro$1{,}2$ milioni contro $\sim$\texteuro$30$ mila all'anno: oltre un ordine di grandezza).
+Il vantaggio non deriva dalla tecnologia in sé ma dal \emph{modello di tariffazione}: il SaaS paga la disponibilità per ogni utente abilitato, mentre i dati di adozione
+mostrano che l'uso reale si concentra su una minoranza della popolazione. Pagare una licenza per ciascun abilitato significa pagare anche per il $60$--$80\%$ che,
+pur avendone accesso, non userebbe lo strumento con regolarità. Il confronto, va ricordato, riguarda il costo \emph{operativo} ricorrente e ignora lo sforzo di sviluppo
+e manutenzione della piattaforma, reale e non trascurabile: non è dunque un TCO completo, la cui stima richiederebbe l'ammortamento del lavoro ingegneristico documentato in questa tesi.

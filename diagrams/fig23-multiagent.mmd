@@ -1,0 +1,13 @@
+flowchart TB
+    Root["Architetture multi-agente LLM"]
+    Root --> Coop["Cooperative<br/>(es. AutoGen)"]
+    Root --> Hier["Hierarchical<br/>supervisor + specialisti"]
+    Root --> Comp["Competitive<br/>(es. Mixture-of-Agents)"]
+    Hier --> Orion["ORION<br/>router = supervisor"]
+    Orion --> SA["SysAid"]
+    Orion --> AC["AllyCare"]
+    Orion --> CP["CooPolicy"]
+    Orion --> SE["self (Vera)"]
+
+    classDef highlight fill:#e8e0ff,stroke:#5b3fb0,stroke-width:2px;
+    class Orion highlight;

@@ -1,0 +1,8 @@
+flowchart TD
+    Docs["Documenti<br/>(PDF, DOCX, HTML)"] --> Ing["Ingestione<br/>chunking"]
+    Ing --> Emb["Embedding<br/>vettori densi"]
+    Emb --> Idx[("Indice<br/>vettoriale")]
+    Idx --> Ret["Retrieval<br/>top-k"]
+    Query["Query utente"] --> Ret
+    Ret --> Gen["Generation<br/>LLM"]
+    Gen --> Ans["Risposta"]

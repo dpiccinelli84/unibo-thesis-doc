@@ -1,0 +1,45 @@
+% !TEX root = ../main.tex
+% =====================================================================
+% ABSTRACT / SOMMARIO
+% =====================================================================
+
+\chapter*{Sommario}
+\addcontentsline{toc}{chapter}{Sommario}
+
+L'adozione degli strumenti di intelligenza artificiale generativa nei contesti
+aziendali è un tema tanto attuale quanto complesso. Da un lato molte voci, 
+spesso legate a chi sviluppa o ridistribuisce queste tecnologie, la
+presentano come una rivoluzione capace di trasformare il lavoro, ridefinire i
+processi e aumentare la produttività su scale fino a poco tempo fa impensabili.
+Dall'altro, l'adozione \emph{enterprise} si scontra con una serie di problemi e
+implicazioni che non godono ancora della stessa risonanza, riassumibili in tre categorie.
+
+\paragraph{Costi.} Il costo di utilizzo dei modelli LLM commerciali più
+performanti è in costante aumento: in caso di adozione poco controllata, la spesa
+associata diventa difficile da governare. Allo stesso tempo, stimare il risparmio
+reale (idealmente derivante dall'aumento di produttività o dalla riduzione dei costi
+operativi) è complesso e tanto più incerto quanto meno
+l'implementazione è ``a fuoco'' e puntuale sui processi e casi d'uso.
+
+\paragraph{Etica.} Come noto e dichiarato dai principali sviluppatori, i modelli LLM sono
+esposti a bias di varia natura. In contesti aziendali in cui i valori etici sono
+parte integrante dell'identità organizzativa, un'adozione indiscriminata rischia
+di diffondere nozioni e approcci in aperto contrasto con la condotta
+dell'organizzazione.
+
+\paragraph{Sovranità del dato.} Questi strumenti, specialmente se usati in modo
+incontrollato o fuori policy dai collaboratori, non offrono garanzie adeguate sulla
+confidenzialità e sulla sicurezza dei dati. Questo può mettere a rischio tanto gli utenti
+quanto l'organizzazione.
+
+Questa tesi descrive in dettaglio come, nella realtà di Coop Alleanza 3.0, sia
+stato implementato un ecosistema di strumenti conversazionali generativi che
+affronta e mitiga i problemi appena citati. Descrive inoltre un approccio metodico
+e misurabile all'orchestrazione del loro utilizzo, realizzato attraverso un
+\emph{LLM Orchestrator} che instrada dinamicamente le richieste dell'utente verso
+l'agente specializzato più appropriato. La valutazione sperimentale misura l'accuratezza
+dell'orchestratore, la qualità del responso degli agenti verticali (execution accuracy
+per il Text-to-SQL, faithfulness per il RAG) e fornisce una stima indicativa 
+della sostenibilità economica della soluzione.
+
+\clearpage

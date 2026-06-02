@@ -1,0 +1,23 @@
+flowchart TB
+    User["Utente"] --> Portal["Portale<br/>(MSAL · Microsoft Entra ID)"]
+    Portal --> Orion["ORION<br/>orchestratore<br/>router Gemini Flash + agent proxy"]
+
+    Orion --> SysAid["SysAid<br/>Text-to-SQL"]
+    Orion --> AllyCare["AllyCare<br/>Text-to-SQL"]
+    Orion --> CooPolicy["CooPolicy<br/>RAG"]
+    Orion --> Self["self · Vera<br/>Web grounding + RAG"]
+
+    SysAid --> Infra
+    AllyCare --> Infra
+    CooPolicy --> Infra
+    Self --> Infra
+
+    subgraph Infra["Infrastruttura condivisa GCP (Cloud Run · rete interna)"]
+        direction LR
+        SQL[("Cloud SQL<br/>PostgreSQL")]
+        BQ[("BigQuery")]
+        VAI["Vertex AI<br/>Gemini · Claude · RAG Engine"]
+    end
+
+    classDef orchestr fill:#e8e0ff,stroke:#5b3fb0,stroke-width:2px;
+    class Orion orchestr;

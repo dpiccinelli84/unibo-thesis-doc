@@ -1,0 +1,13 @@
+flowchart TB
+    A["Adozione enterprise dell'AI generativa"]
+    B["Tre ostacoli strutturali:<br/>costo · sovranità del dato · affidabilità"]
+    C["Grounding<br/>Web · RAG · Text-to-SQL"]
+    D["Agenti verticali specializzati su GCP"]
+    E["Orchestrati da ORION<br/>routing LLM-based + confidence/clarification"]
+    F["Framework di valutazione iterativa del routing"]
+    A --> B --> C --> D --> E --> F
+
+    classDef ctx fill:#eef2ff,stroke:#3b4ea0;
+    classDef contrib fill:#e8e0ff,stroke:#5b3fb0,stroke-width:2px;
+    class A,B,C ctx;
+    class D,E,F contrib;

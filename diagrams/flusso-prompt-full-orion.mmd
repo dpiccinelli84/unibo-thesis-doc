@@ -1,0 +1,23 @@
+%% Catena di sicurezza + routing — Orion (Sez. 4.4.4 + Cap. 6)
+%% Variante di flusso-prompt-full con lo step di routing dell'orchestratore.
+flowchart TD
+    U([Utente]) --> M[messaggio]
+    M --> Q{Budget token<br/>sufficiente?}
+    Q -->|no| E([Errore 400<br/>quota esaurita])
+    Q -->|si| MA[Model Armor<br/>RAI + Prompt Injection +<br/>DLP]
+    MA --> EX{Motivi coperti<br/>da esenzione gruppo?}
+    EX -->|no, bloccato| SL[Security log<br/>prompt bloccato]
+    SL --> RR([Richiesta rifiutata<br/>all'utente])
+    EX -->|si| RT[Router Orion<br/>intento + complessità + confidence]
+    RT --> RD{Esito routing}
+    RD -->|confidence bassa| CLA([Richiesta di chiarimento<br/>all'utente])
+    RD -->|agente specializzato| SUB[Sub-agente via proxy<br/>SysAid / AllyCare / CooPolicy]
+    RD -->|self| LLM[LLM]
+    SUB --> RG[Risposta generata]
+    LLM --> RG[Risposta generata]
+    RG --> MAO[Model Armor<br/>sanitizzazione output]
+    MAO --> EX2{Motivi coperti<br/>da esenzione?}
+    EX2 -->|si| CLG[chat_logs + routing log<br/>audit + token contabilizzati]
+    CLG --> RU([Risposta + badge<br/>all'utente])
+    EX2 -->|no, bloccato| SL2[Security log<br/>risposta bloccata]
+    SL2 --> RB([Risposta bloccata])

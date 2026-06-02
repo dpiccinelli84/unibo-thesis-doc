@@ -1,0 +1,66 @@
+erDiagram
+    orion_users ||--o{ orion_conversations : "ha"
+    orion_conversations ||--o{ orion_messages : "contiene"
+    orion_users ||--o{ orion_routing_logs : "genera (username)"
+    orion_conversations |o--o{ orion_routing_logs : "riferita da"
+    orion_eval_test_cases ||--o{ orion_eval_results : "valutato in (test_id)"
+
+    orion_users {
+        uuid id PK
+        string email
+        string name
+        string badge
+        string role
+        string direction
+        bool is_admin
+        int tokens_limit
+    }
+    orion_conversations {
+        uuid id PK
+        uuid user_id FK
+        string title
+        string model_used
+        datetime created_at
+    }
+    orion_messages {
+        uuid id PK
+        uuid conversation_id FK
+        string role
+        text content
+        json citations
+        int tokens_input
+        int tokens_output
+    }
+    orion_routing_logs {
+        uuid id PK
+        string username
+        uuid conversation_id
+        string prompt_excerpt
+        string agent_selected
+        string complexity
+        float confidence
+        bool clarification_asked
+        text reasoning
+    }
+    orion_eval_test_cases {
+        uuid id PK
+        string test_id UK
+        text prompt
+        string agent_expected
+        string complexity_expected
+        string category
+        bool is_active
+    }
+    orion_eval_results {
+        uuid id PK
+        string run_id
+        string prompt_version
+        string test_case_id
+        string agent_expected
+        string agent_produced
+        string complexity_expected
+        string complexity_produced
+        float confidence
+        bool agent_correct
+        bool complexity_correct
+    }

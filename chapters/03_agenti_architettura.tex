@@ -1,0 +1,252 @@
+% !TEX root = ../main.tex
+% =====================================================================
+% CAPITOLO 3 — ARCHITETTURA DEL PORTALE E DEGLI AGENTI VERTICALI
+% =====================================================================
+
+\chapter{La suite di agenti: architettura}
+\label{chap:agenti-architettura}
+
+Questo capitolo si concentra sulla prima fase del progetto, descrivendo le scelte architetturali compiute, e i vincoli e requisiti 
+che le hanno condizionate.
+In particolare sono descritte ad alto livello le architetture dei singoli agenti verticali, dei sistemi che li ospitano e dei
+flussi di rilascio e gestione del ciclo di vita del software;
+i dettagli implementativi sono invece riportati nel Capitolo~\ref{chap:agenti-implementazione}.
+
+% =====================================================================
+\section{Principi guida e architettura d'insieme}
+\label{sec:agenti-principi}
+% =====================================================================
+
+\subsection{Principi guida}
+\label{subsec:agenti-principi-guida}
+
+La progettazione è stata guidata da una serie di principi fondamentali trasversali,
+stabiliti prima di avviare lo sviluppo e mantenuti durante tutte le fasi successive.
+
+\begin{description}
+
+  \item[Rispetto dei principi etici e cooperativi]
+    Gli agenti LLM sono intrinsecamente portati a esprimere bias: è un limite strutturale dei modelli generativi (Sez.~\ref{sec:bg-llm}).
+    Per Coop Alleanza è importante mitigare i possibili effetti negativi sugli utenti, caratterizzando inoltre il comportamento
+    degli agenti nel pieno rispetto dei principi etici che sono alla base della Cooperativa.
+    Mettendo a disposizione degli utenti un pacchetto di assistenti per le loro necessità, si può cercare di 
+    prevenire l'utilizzo da parte loro di strumenti AI esterni pubblici e/o non autorizzati (fenomeno chiamato ``Shadow AI'').
+    Oltre alla riduzione degli evidenti rischi per la sicurezza del dato, gli strumenti a sviluppo interno possono essere ``istruiti'' 
+    secondo dei ``prompt di sistema'' stabiliti collegialmente fra i vari uffici interni, facendo sì
+    che le risposte prodotte siano conformi ai valori cooperativi ed etici, o comunque ai valori dell'organizzazione. 
+    A tal fine, tutti i prompt di sistema dei vari agenti devono integrare direttive esplicite, volte a  
+    garantire che ogni agente rifletta l'identità e i valori dell'organizzazione, 
+    in conformità con i requisiti di trasparenza e \emph{human oversight} previsti dal 
+    Regolamento Europeo sull'Intelligenza Artificiale~\cite{eu2024aiact}, 
+    mantenendo inoltre la possibilità di modifiche in corso d'opera e cicli di aggiornamento rapidi e controllati.
+
+  \item[Governance facilitata e efficace]
+    Gli agenti devono implementare soluzioni adeguate a prevenire utilizzi impropri e fughe di dati personali.
+    Le configurazioni relative al prompt di sistema (la ``personalità'' dell'agente) e del grado di controllo su utilizzi impropri e 
+    dati personali devono essere visualizzabili e impostabili da una dashboard apposita,
+    che consenta agli uffici preposti (che non hanno competenza tecnica stretta) di controllare intuitivamente questi parametri. 
+    Inoltre deve essere possibile, nel rispetto della privacy, monitorare i casi di eventi segnalati come ``pericolosi''.
+    Tutto il codice sorgente deve essere presente e aggiornato nel repository Git usato dall'organizzazione, e considerato 
+    proprietà della Cooperativa.
+
+  \item[Implementazione agnostica e sostenibile]
+    Nella realtà aziendale attuale, molti fornitori propongono i propri modelli di assistenti o agenti AI.
+    Spesso questo comporta il rischio di una dipendenza (vendor lock-in) più o meno rilevante: ad esempio, le soluzioni ``out of the box'' 
+    risultano di difficile trasposizione verso realtà infrastrutturali diverse da quelle del fornitore. 
+    Inoltre spesso sono richiesti piani di abbonamento o sottoscrizioni che possono comportare costi fissi elevati 
+    anche in caso di effettivo inutilizzo dello strumento.
+    La soluzione realizzata deve essere completamente portabile e facilmente adattabile 
+    verso qualunque architettura; inoltre deve consentire un controllo attivo, adattivo e dinamico dei costi, stanziando
+    periodicamente un budget di utilizzo definito dagli amministratori (``token'') per ogni utente, granularmente modificabile in 
+    caso di necessità, così da garantire la sostenibilità del progetto.
+    Ovunque possibile deve essere implementato un ``routing'' che indirizzi verso modelli più semplici ed economici le richieste a bassa complessità.
+
+  \item[Sovranità del dato]
+    Nessun dato deve lasciare il perimetro cloud europeo, in conformità al Regolamento Generale sulla Protezione dei Dati (GDPR).
+
+  \item[Modularità verticale]
+    Ogni dominio informativo o funzionale deve essere affidato a un agente autonomo e indipendente,
+    con il proprio meccanismo di grounding, il proprio ciclo di vita applicativo e la propria infrastruttura di deployment: 
+    in modo che sia possibile effettuare \emph{prompt engineering} e \emph{few-shot learning}~\cite{brown2020gpt3} 
+    ad hoc per il singolo caso d'uso.
+    I sistemi devono essere il più possibile isolati per consentire di aggiornare, monitorare e
+    scalare ogni servizio in modo indipendente.
+
+  \item[Automazione dei rilasci]
+    Le evolutive devono potere essere rilasciate in maniera trasparente verso l'utente senza causare disservizio, 
+    in maniera automatizzata per ridurre al minimo la possibilità di errore umano, 
+    e con uno step approvativo per il passaggio in produzione.
+
+  \item[Accesso privato e con controllo centralizzato]
+    L'intero ecosistema deve potere essere accessibile solo da rete interna o VPN di Coop Alleanza:
+    l'infrastruttura utilizzata deve quindi evitare l'esposizione su rete pubblica.
+    Il controllo dell'abilitazione degli utenti all'uso degli assistenti deve integrarsi con il sistema di Identity Management 
+    già esistente nell'organizzazione, basato sui protocolli OAuth~2.0~\cite{rfc6749oauth2} e OpenID Connect~\cite{oidc1_0core} 
+    su Microsoft Entra ID~\cite{msft_entra_id}.
+
+\end{description}
+
+\subsection{Architettura d'insieme}
+\label{subsec:agenti-architettura-insieme}
+
+L'ecosistema di agenti deve essere accessibile da un unico ``portale'', così che l'utente possa abituarsi all'utilizzo 
+di un unico punto di accesso: è la logica conseguenza della modularità verticale descritta in precedenza.
+I nuovi agenti potranno semplicemente essere inseriti nel ``framework'' esistente.
+Lo stesso approccio vale per le dashboard di configurazione (``admin panel'') quando necessarie, 
+anch'esse radunate in un portale dedicato.
+
+Pur mantenendo come centrale e rilevante il principio della maggiore agnosticità, portabilità e indipendenza possibili,
+tutte le implementazioni saranno realizzate con le risorse disponibili sulla piattaforma Cloud di Google~\cite{gcp_vertexai,gcp_cloudrun}:
+si tratta al momento dell'unico fornitore di sistemi cloud attivo in Coop Alleanza (come approfondito anche di seguito, le risorse del data center
+on-premises, pur esistenti, non consentono una realizzazione abbordabile e performante di progetti di AI generativa).
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.9\textwidth]{fig1}
+  \caption[Architettura d'insieme della suite di agenti]{Architettura
+    della suite di agenti verticali: portal con autenticazione federata,
+    quattro servizi di calcolo serverless indipendenti e infrastruttura
+    condivisa per database, data warehouse e servizi AI.}
+  \label{fig:architettura_suite}
+\end{figure}
+
+% =====================================================================
+\section{Vera --- assistente generale con Web grounding}
+\label{sec:agenti-vera-arch}
+% =====================================================================
+
+\subsection{Caso d'uso e posizionamento}
+\label{subsec:vera-caso-uso}
+
+Vera è l'agente generalista del pacchetto, deve potere coprire i tipici casi d'uso per cui un utente 
+potrebbe rivolgersi a un LLM esterno all'organizzazione:
+analisi e riassunto di documenti e testi, formazione e approfondimento, correzione di codice e formule e così via.
+Deve quindi supportare la possibilità per l'utente di caricare documenti tramite tecnologia RAG~\cite{lewis2020rag} 
+nel maggior numero possibile di formati e, per le richieste che necessitano di informazioni attuali, deve potere accedere
+a internet attraverso il meccanismo di Web grounding~\cite{gcp_grounding} che ancora la generazione a 
+risultati provenienti da Google Search e ne mitiga il rischio di allucinazione su fatti recenti. 
+Quando le risposte fornite vengono tratte da documenti caricati o da internet, la fonte deve essere sempre presente e verificabile.
+Ci deve essere certezza che nello svolgere queste ricerche non possa accadere esfiltrazione 
+di dati presenti in documenti o prompt caricati dall'utente, che potrebbero essere confidenziali.
+
+% =====================================================================
+\section{CooPolicy --- RAG su corpus di policy condiviso}
+\label{sec:agenti-coopolicy-arch}
+% =====================================================================
+
+\subsection{Caso d'uso e posizionamento}
+\label{subsec:coopolicy-caso-uso}
+
+CooPolicy è l'agente specializzato nella ricerca e nell'interpretazione di documenti normativi interni: 
+deve gestire in sostanza tutta la documentazione presente sulla Intranet aziendale,
+che tratta gli argomenti più vari e si è espansa nel corso degli anni, fino a diventare frastagliata 
+e spesso di non facile consultazione.
+Le tematiche trattate dai documenti possono comprendere, a titolo di esempio: 
+manuali d'uso, procedure, contratti di lavoro, organigrammi, comunicazioni organizzative.
+
+A differenza di Vera, CooPolicy non deve avere accesso a fonti esterne: vincolo essenziale è che le 
+risposte agli utenti siano fornite in maniera precisa e approfondita se il materiale è presente nel
+contesto RAG fornito~\cite{lewis2020rag,guu2020realm}, oppure che non siano fornite affatto.
+Anche in questo caso ogni fonte deve essere correttamente citata e accessibile.
+Devono essere messe in atto tutte le tecniche più adeguate per instradare correttamente le 
+richieste degli utenti anche se pervenute in formato molto stringato o interpretabile: a tal fine, il sistema 
+classifica ogni query per selezionare il corpus tematico più pertinente e applica una soglia di 
+rilevanza permissiva che delega al modello generativo la decisione finale sull'utilità dei chunk recuperati.
+
+% =====================================================================
+\section{AllyCare / NPS --- Text-to-SQL sui dati dei sondaggi}
+\label{sec:agenti-allycare-arch}
+% =====================================================================
+
+\subsection{Caso d'uso e posizionamento}
+\label{subsec:allycare-caso-uso}
+
+AllyCare è l'agente specializzato nell'analisi dei dati dei sondaggi NPS (Net Promoter Score) condotti dall'organizzazione.
+La base dati di appoggio è in formato tabellare e sottoposta ad aggiornamento costante:
+nei sondaggi, oltre a chiedere un voto per ognuno dei vari aspetti dell'esperienza di acquisto, viene lasciata la possibilità di compilare
+un campo di testo libero con ciò che l'utente ritiene di segnalare.
+Un flusso LLM dedicato analizza i commenti presenti e li cataloga in base a delle tabelle specifiche (reparto e argomento di riferimento, valutazione del sentiment del commento, e così via)
+e infine compila una tabella ``ai enriched'' che comprende sia tutti i dati di base di ogni singola risposta (voti etc) che i nuovi ``tag'' generati.
+
+L'agente AllyCare ha lo scopo di facilitare le analisi su questa tabella: 
+deve svolgere sia compiti che tradizionalmente avrebbero richiesto la creazione di reportistica ad hoc
+(risposta a domande quantitative come ``numero di voti positivi per il periodo X, per il negozio Y'', e così via,
+oppure creazione di grafici di andamento nel tempo), sia compiti di analisi qualitativa
+che richiederebbero molto tempo: domande come ``elenca le maggiori criticità nella regione / negozio specifico'' e simili.
+
+La richiesta dell'utente deve quindi essere tradotta dal modello in una (o più) query SQL adeguate, 
+che vengono poi eseguite e il cui risultato viene utilizzato
+per fornire la risposta e le successive analisi, secondo il paradigma Text-to-SQL descritto nella Sez.~\ref{subsec:bg-text2sql}.
+
+% =====================================================================
+\section{SysAid --- Text-to-SQL sul ticketing con modelli LLM distinti}
+\label{sec:agenti-sysaid-arch}
+% =====================================================================
+
+\subsection{Caso d'uso e posizionamento}
+\label{subsec:sysaid-caso-uso}
+
+SysAid è l'agente specializzato nell'analisi della base dati di ticketing dell'organizzazione.
+Anche in questo caso, la base dati di appoggio è in formato tabellare: è una copia ``in streaming'' in tempo reale del database effettivo del servizio.
+
+L'agente deve facilitare le analisi su questa base dati, svolgendo anche in questo caso sia compiti che tradizionalmente 
+avrebbero richiesto la creazione di reportistica ad hoc
+(numeriche, andamenti, tempi di risoluzione...), sia compiti di analisi qualitativa che richiederebbero molto tempo: 
+domande come ``elenca le maggiori criticità nella regione / negozio specifico''.
+Inoltre data la presenza di dati realtime, deve essere in grado di fornire informazioni sullo stato di salute attuale 
+dei sistemi informativi così da fornire supporto al troubleshooting.
+Una fascia di utenza ideale, oltre al management, è quella del personale del Service Desk.
+
+Anche in questo caso, la richiesta dell'utente deve quindi essere tradotta dal modello in una (o più) query SQL adeguate, 
+che vengono poi eseguite e il cui risultato viene utilizzato per fornire la risposta e le successive analisi.
+
+\subsection{Pluralità del modello nel routing}
+\label{subsec:agenti-sysaid-confronto}
+
+SysAid deve implementare in modo più esplicito il principio di indipendenza dal fornitore di LLM. 
+Il backend deve essere realizzato come servizio unificato che ospita due code parallele, alimentate da due fornitori concorrenti: 
+Gemini 2.5 Flash su Vertex AI~\cite{gcp_vertexai} per le richieste a bassa complessità e 
+Claude Sonnet su AnthropicVertex~\cite{anthropic_docs} per le richieste ad alta complessità; 
+Gemini Flash si deve occupare anche della valutazione della complessità.
+
+Entrambe le code path condividono la medesima base di conoscenza, la stessa struttura di database, 
+i medesimi strumenti per l'analisi dei dati e l'interfaccia utente.
+
+% =====================================================================
+\section{Alternative scartate}
+\label{sec:agenti-alternative}
+% =====================================================================
+
+Questa sezione documenta le principali alternative considerate e le
+ragioni per cui non sono state adottate.
+
+\paragraph{Orchestratore centrale fin dalla versione~1.}
+La prima alternativa valutata era introdurre un orchestratore
+intelligente già nella versione iniziale della suite, ispirato
+ai pattern multi-agente proposti dalla letteratura recente~\cite{wu2023autogen,guo2024multiagent,wang2024moa}, eliminando la
+necessità per l'utente di selezionare esplicitamente l'agente. Questa
+opzione è stata inizialmente scartata per una ragione metodologica: costruire
+contemporaneamente gli agenti specializzati e il loro orchestratore
+avrebbe reso molto più difficile isolare e diagnosticare i problemi e probabilmente avrebbe 
+condotto a performance degli agenti ``verticali'' molto meno ottimizzate.
+Validare ogni agente indipendentemente è molto più semplice in un contesto ``verticale'' isolato.
+
+\paragraph{Fine-tuning o training di un modello proprietario o open source.}
+Un'altra alternativa esplorata nella fase di analisi iniziale è stata quella di 
+addestrare
+un modello sui dati interni dell'organizzazione, per creare un LLM
+specializzato sul dominio aziendale. 
+Questa opzione è stata scartata
+per tre ragioni. In primo luogo, il costo di addestramento e
+mantenimento di un modello su scala enterprise è proibitivo per
+un'organizzazione che non ha nel proprio core business lo sviluppo
+di modelli AI: non è presente hardware adeguato (il core business della cooperativa è ben diverso)
+e acquisirlo, sia on-premises che cloud, comporterebbe costi non giustificabili.
+In secondo luogo, il fine-tuning non risolve il
+problema fondamentale del knowledge cutoff: un modello addestrato sui
+dati di sei mesi fa non conosce i ticket aperti questa settimana, né
+le policy aggiornate ieri. Il grounding è
+la risposta corretta per i dati che cambiano nel tempo.
+
+
+

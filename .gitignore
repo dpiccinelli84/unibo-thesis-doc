@@ -1,0 +1,30 @@
+# LaTeX build artifacts (auxiliary files - regenerated on each build)
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.fdb_latexmk
+*.fls
+*.lof
+*.log
+*.lot
+*.out
+*.run.xml
+*.synctex.gz
+*.toc
+*.nav
+*.snm
+*.vrb
+
+
+# Materiale di riferimento UniBO (guida, template, frontespizio compilato):
+# materiale di consultazione, non versionato.
+guide-unibo-scrittura-tesi/
+
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.idea/

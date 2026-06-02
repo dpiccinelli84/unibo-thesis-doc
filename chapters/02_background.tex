@@ -1,0 +1,353 @@
+% !TEX root = ../main.tex
+% =====================================================================
+% CAPITOLO 2 — BACKGROUND
+% =====================================================================
+
+\chapter{Background}
+\label{chap:background}
+
+Questo capitolo introduce i concetti e le tecnologie su cui si fondano i contributi della tesi. 
+L'obiettivo è trattare i temi utilizzati nei capitoli successivi 
+fornendo i riferimenti bibliografici per l'approfondimento. 
+
+% =====================================================================
+\section{Dai modelli di linguaggio ai Transformer}
+\label{sec:bg-transformer}
+% =====================================================================
+
+I modelli di linguaggio statistico hanno attraversato tre generazioni in rapida successione. 
+I modelli basati su $n$-grammi, dominanti fino alla metà degli anni~2010, stimano la probabilità della parola successiva sulla base delle $n-1$ parole precedenti: 
+la semplicità li rende efficienti ma incapaci di catturare dipendenze a lungo raggio. 
+Le reti neurali ricorrenti (RNN) e le loro varianti LSTM hanno superato questo limite modellando la sequenza come uno stato nascosto aggiornato ad ogni passo, 
+ma al costo di un addestramento sequenziale che ne ha limitato la scalabilità.
+
+La svolta è arrivata nel 2017 con l'architettura Transformer~\cite{vaswani2017attention}, 
+che sostituisce la ricorrenza con un meccanismo di \emph{self-attention}: 
+ogni token della sequenza può ``attendere'' direttamente a qualsiasi altro token, indipendentemente dalla distanza. 
+Questa proprietà ha due conseguenze pratiche decisive: 
+la parallelizzazione completa dell'addestramento su GPU e la capacità di catturare 
+dipendenze a lungo raggio senza degrado del gradiente.
+
+L'architettura originale prevede un encoder e un decoder, ciascuno composto da blocchi di multi-head attention e feed-forward network. 
+Nella pratica attuale, i modelli di linguaggio più potenti sono quasi esclusivamente \emph{decoder-only}: 
+ricevono una sequenza di token in ingresso e generano la continuazione un token alla volta, in modo autoregressivo. 
+GPT~\cite{brown2020gpt3}, LLaMA, Gemini~\cite{team2024gemini} e Claude~\cite{anthropic2024claude} sono tutti modelli decoder-only.
+
+% =====================================================================
+\section{Large Language Model: capacità, limiti, allineamento}
+\label{sec:bg-llm}
+% =====================================================================
+
+Un \emph{Large Language Model} (LLM) è un Transformer decoder-only addestrato con il paradigma autoregressivo 
+su un corpus testuale di scala web (centinaia di miliardi di token). 
+Il pre-training produce un modello che, dato un prefisso, genera la continuazione più probabile; 
+con l'aumento della scala (parametri, dati, calcolo), emergono capacità non esplicitamente programmate: 
+ragionamento aritmetico, traduzione, generazione di codice, risoluzione di problemi a passi~\cite{brown2020gpt3}.
+
+L'allineamento del modello al comportamento desiderato avviene in due fasi successive al pre-training. 
+L'\emph{instruction tuning} addestra il modello su coppie (istruzione, risposta desiderata) curate da annotatori umani; 
+il \emph{Reinforcement Learning from Human Feedback} (RLHF)~\cite{ouyang2022instructgpt} addestra un modello di ricompensa 
+sulle preferenze umane e lo utilizza per raffinare ulteriormente il modello. 
+Il risultato è un modello che segue istruzioni, rifiuta richieste pericolose e produce risposte strutturate.
+
+Il limite strutturale più rilevante per le applicazioni enterprise è l'\emph{allucinazione}: 
+il modello genera affermazioni plausibili e formulate in maniera coerente e formalmente impeccabile,
+ma false o comunque errate.
+Questo perché il meccanismo di generazione ottimizza la verosimiglianza linguistica, non la veridicità~\cite{xu2024hallucination}. 
+La letteratura mostra che il fenomeno è innato e non eliminabile per via puramente algoritmica.
+
+Un secondo limite è il \emph{knowledge cutoff}: il modello conosce solo i fatti presenti nel corpus di addestramento, 
+che ha inevitabilmente un perimetro limitato nel tempo e nei contenuti. 
+Per un'organizzazione i cui dati cambiano quotidianamente (ticket aperti, NPS aggiornato, policy revisionate), 
+un modello ``nudo'' è sostanzialmente inutile. 
+
+Le contromisure efficaci per queste limitazioni operano a livello di sistema (grounding, retrieval, vincoli di prompt), non di modello. 
+Questa osservazione è il fondamento teorico delle scelte di grounding adottate nel presente lavoro.
+
+Per una panoramica sistematica delle metodologie di valutazione degli LLM si rimanda a~\cite{chang2023llmsurvey}.
+
+% =====================================================================
+\section{Prompt engineering, function calling, output strutturato}
+\label{sec:bg-prompting}
+% =====================================================================
+
+Il \emph{prompt engineering} è l'insieme di tecniche che, senza modificare i pesi del modello (operazione che non è nemmeno possibile per i 
+modelli commerciali ``closed''), ne guidano il comportamento attraverso la formulazione dell'input.
+Le tecniche principali, in ordine di sofisticazione, sono:
+
+\begin{description}
+  \item[Zero-shot.] L'istruzione è formulata senza esempi: ``Traduci in francese: [testo]''. Efficace per compiti semplici.
+  \item[Few-shot.] L'istruzione è accompagnata da uno o più esempi di input-output: il modello inferisce il pattern e lo applica al nuovo input~\cite{brown2020gpt3}. 
+  È la tecnica usata nel prompt dell'orchestratore, dove ogni agente è descritto con esempi di richieste tipiche.
+  \item[Chain-of-Thought (CoT).] Il modello è istruito a esplicitare il ragionamento intermedio prima di produrre la risposta finale~\cite{wei2022cot}. 
+  La tecnica migliora l'accuracy su compiti di ragionamento e, nel contesto della tesi, produce un campo \texttt{reasoning} che rende tracciabili le decisioni.
+\end{description}
+
+Un'estensione cruciale del prompting è il \emph{function calling} (o \emph{tool use}): 
+il modello, anziché rispondere direttamente, emette una chiamata strutturata a una funzione esterna, 
+riceve il risultato e lo integra nella risposta. 
+Questo meccanismo è alla base del paradigma agentico ReAct~\cite{yao2022react}, 
+descritto in dettaglio nella Sez.~\ref{sec:bg-multiagent}.
+
+L'\emph{output strutturato} è un'evoluzione del function calling in cui il modello 
+è vincolato a produrre un JSON conforme a uno schema predefinito~\cite{willard2023outlines}. 
+A differenza del parsing libero dell'output testuale, la \emph{guided generation} garantisce conformità sintattica: 
+il modello non può generare token che violano lo schema. 
+Questa tecnica è utilizzata dal router di orchestrazione per
+produrre l'oggetto di classificazione (agente, complessità, confidence, reasoning) 
+in modo deterministico e correttamente interpretabile (parsing).
+
+% =====================================================================
+\section{Grounding: ancorare la generazione a fonti esterne}
+\label{sec:bg-grounding}
+% =====================================================================
+
+Il \emph{grounding} è l'insieme di tecniche che ancorano la generazione del modello a fonti esterne verificabili, 
+mitigando il rischio di allucinazione~\cite{guu2020realm}. Sostanzialmente, il contesto del modello viene arricchito con 
+informazioni recuperate al momento stesso della richiesta, recuperate da fonti che possono essere citate dal modello, verificate, 
+e (tranne nel caso del web grounding) note a priori. 
+Di seguito i dettagli delle tipologie di grounding adottate:
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.95\textwidth,keepaspectratio]{grounding}
+    \caption[Tre forme di grounding affiancate]{Tre meccanismi di grounding adottati nella suite: Web grounding (Vera - Orion), RAG (CooPolicy) e Text-to-SQL (AllyCare, SysAid).}
+    \label{fig:grounding_three_ways}
+\end{figure}
+
+\subsection{Web grounding}
+\label{subsec:bg-web-grounding}
+
+Il Web grounding integra i risultati di un motore di ricerca nel contesto del modello. 
+Nel contesto di Vertex AI, il servizio \emph{Grounding with Google Search}~\cite{gcp_grounding} fornisce un'integrazione nativa: 
+il modello, quando rileva che la domanda richiede informazioni attuali o fattuali verificabili, 
+invoca automaticamente Google Search, recupera i risultati rilevanti e li utilizza come contesto per la generazione. 
+Le risposte includono metadati di grounding (URL, titolo, snippet) che il frontend può 
+visualizzare in forma di citazioni cliccabili.
+
+Il Web grounding è appropriato per fatti pubblici e attualità, ma inadeguato per dati privati di un'organizzazione.
+Per questo caso d'uso sono invece indicati RAG e Text-to-SQL.
+
+\subsection{Retrieval-Augmented Generation}
+\label{subsec:bg-rag}
+
+La Retrieval-Augmented Generation (RAG)~\cite{lewis2020rag} è una tecnica che arricchisce il contesto del modello 
+con frammenti (\emph{chunk}) recuperati da un corpus documentale indicizzato. 
+La pipeline canonica prevede cinque fasi:
+
+\begin{enumerate}
+  \item \textbf{Ingestione.} I documenti sorgente (PDF, DOCX, HTML) sono suddivisi in chunk di dimensione fissa (tipicamente 256--1024~token) 
+  con sovrapposizione parziale per preservare la continuità semantica.
+  \item \textbf{Embedding.} Ogni chunk è trasformato in un vettore numerico denso da un modello di embedding (nel caso della suite, \texttt{text-multilingual-embedding-002}).
+  \item \textbf{Indicizzazione.} I vettori sono inseriti in un indice vettoriale che supporta ricerca per similarità coseno.
+  \item \textbf{Retrieval.} Data la query dell'utente, il sistema la trasforma in un vettore e recupera i $k$ chunk più simili.
+  \item \textbf{Generation.} I chunk recuperati sono inseriti nel prompt del modello come contesto, e il modello genera la risposta vincolata a quel contesto.
+\end{enumerate}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[height=0.85\textheight,keepaspectratio]{rag-pipe}
+    \caption[Pipeline RAG canonica]{Pipeline canonica di Retrieval-Augmented Generation. Le prime tre fasi (ingestione, embedding, indicizzazione) 
+    costruiscono \emph{offline} l'indice vettoriale a partire dai documenti; 
+    a \emph{runtime} la query dell'utente innesca il retrieval dei $k$ chunk più simili, che diventano il contesto per la generazione.}
+    \label{fig:rag_pipeline}
+\end{figure}
+
+Diverse varianti migliorano la qualità del retrieval.
+La \emph{hybrid search} combina ricerca vettoriale densa e matching lessicale BM25, bilanciando robustezza semantica e precisione su termini esatti. 
+La \emph{query expansion} genera varianti della query originale per migliorare il recall. 
+HyDE genera un documento ipotetico come risposta alla query e lo utilizza come anchor per il retrieval, 
+sfruttando la maggiore ricchezza lessicale del documento generato rispetto alla query originale. 
+Queste tecniche sono rilevanti come contesto teorico, il loro effettivo utilizzo va valutato nel contesto dell'implementazione.
+
+Nella tesi, CooPolicy utilizza Vertex AI RAG Engine~\cite{gcp_vertex_rag} come implementazione managed della pipeline. 
+Le scelte implementative specifiche (multi-corpus tematico, classificazione della query e soglia di rilevanza) 
+sono discusse nella Sez.~\ref{subsec:coopolicy-multicorpus}. 
+La distinzione tra corpus condiviso (CooPolicy) e corpus per-utente (Vera) 
+è descritta nel Capitolo~\ref{chap:agenti-architettura}.
+
+\subsection{Text-to-SQL}
+\label{subsec:bg-text2sql}
+
+Il Text-to-SQL è la traduzione automatica di una domanda in linguaggio naturale in una query SQL eseguibile su un database relazionale o un data warehouse. 
+A differenza del RAG, che opera su testi non strutturati, il Text-to-SQL opera su dati strutturati: la ``fonte di verità'' non è un documento ma una tabella.
+
+Le sfide principali del Text-to-SQL sono la \emph{schema awareness} (il modello deve conoscere la struttura delle tabelle), 
+la gestione dei dialetti SQL, le aggregazioni temporali e le operazioni multi-tabella. 
+I benchmark di riferimento sono Spider~\cite{yu2018spider} (cross-domain, schema complesso) e 
+BIRD~\cite{li2023bird} (su database reali di grandi dimensioni). 
+Le tecniche più efficaci con LLM includono l'iniezione selettiva dello schema nel prompt, 
+la decomposizione della query in sotto-query e l'auto-correzione: quando la query generata produce un errore SQL, 
+il modello riceve il messaggio di errore e tenta una nuova formulazione~\cite{pourreza2023dinsql}.
+
+Nella tesi, AllyCare e SysAid implementano il pattern Text-to-SQL su BigQuery con il ciclo ReAct (Sez.~\ref{sec:bg-multiagent}).
+
+% =====================================================================
+\section{Valutazione automatica di sistemi RAG}
+\label{sec:bg-ragas}
+% =====================================================================
+
+La valutazione di un sistema RAG richiede metriche che catturino sia la qualità del retrieval sia la qualità della generazione. 
+Il framework RAGAS~\cite{es2023ragas} propone un insieme di metriche calcolate automaticamente con il paradigma \emph{LLM-as-judge}: 
+un modello valuta la risposta di un altro modello.
+Le metriche principali sono:
+
+\begin{itemize}
+  \item \textbf{Faithfulness}: quanto la risposta è supportata dai documenti recuperati (anti-allucinazione).
+  \item \textbf{Answer Relevancy}: quanto la risposta è pertinente alla domanda.
+  \item \textbf{Context Precision}: quanto i chunk recuperati sono rilevanti (precisione del retrieval).
+  \item \textbf{Context Recall}: quanti dei chunk necessari sono stati recuperati (recall del retrieval).
+\end{itemize}
+
+Il paradigma LLM-as-judge presenta limiti noti: 
+bias di posizione (preferenza per la prima opzione), 
+bias di lunghezza (preferenza per risposte più lunghe), 
+auto-preferenza (un modello preferisce i propri output)~\cite{zheng2023llmjudge}. 
+Questi limiti sono discussi nel Capitolo~\ref{chap:orion-valutazione}.
+
+% =====================================================================
+\section{Agenti LLM e architetture multi-agente}
+\label{sec:bg-multiagent}
+% =====================================================================
+
+Un \emph{agente LLM} è un sistema in cui il modello di linguaggio non si limita a generare testo 
+ma interagisce con l'ambiente esterno attraverso un ciclo di azione e osservazione. 
+Il paradigma più diffuso è ReAct~\cite{yao2022react}, che alterna tre fasi: 
+\emph{Thought} (ragionamento sulla situazione corrente), 
+\emph{Action} (invocazione di un tool esterno) e 
+\emph{Observation} (ricezione del risultato del tool). 
+Il ciclo si ripete fino a quando il modello produce una risposta finale.
+
+Le architetture multi-agente estendono il paradigma singolo-agente a sistemi con $N$ agenti 
+che cooperano o competono per risolvere un compito. 
+Un survey recente~\cite{guo2024multiagent} identifica tre macro-categorie:
+
+\begin{description}
+  \item[Cooperative.] Gli agenti collaborano alla soluzione: ogni agente contribuisce con la propria specializzazione. 
+  AutoGen~\cite{wu2023autogen} implementa questo pattern con un \emph{GroupChatManager} che coordina la conversazione tra agenti.
+  \item[Hierarchical.] Un agente \emph{supervisor} coordina $N$ agenti specializzati, assegnando i compiti e aggregando i risultati. 
+  Orion implementa questo pattern: il router è il supervisor, i sub-agenti sono gli specialisti.
+  \item[Competitive.] Gli agenti producono soluzioni indipendenti e un meccanismo di selezione sceglie la migliore. 
+  Mixture-of-Agents~\cite{wang2024moa} è un esempio recente.
+\end{description}
+
+La distinzione con Mixture-of-Experts~\cite{jiang2024mixtral} è importante: 
+MoE è una tecnica \emph{interna al modello} (routing tra sotto-reti), 
+mentre le architetture multi-agente operano \emph{tra modelli} o servizi distinti. 
+Orion è un sistema multi-agente, non un MoE.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.95\textwidth,keepaspectratio]{multiagente}
+    \caption[Tassonomia delle architetture multi-agent LLM]{Le tre macro-categorie di architetture multi-agent, con il posizionamento di Orion nel ramo \emph{hierarchical}.}
+    \label{fig:multiagent_taxonomy}
+\end{figure}
+
+% =====================================================================
+\section{LLM routing e ottimizzazione costo--qualità}
+\label{sec:bg-routing}
+% =====================================================================
+
+Il \emph{LLM routing} è il problema di selezionare, per ciascuna richiesta, il modello (o l'agente) più appropriato in base a un trade-off costo/qualità. 
+FrugalGPT~\cite{chen2023frugalgpt} formalizza il problema come un \emph{LLM cascade}: 
+i modelli sono ordinati per costo crescente, e la richiesta viene inoltrata al modello successivo 
+solo se quello corrente non è sufficientemente sicuro della risposta (early-exit basato su confidenza).
+
+RouteLLM~\cite{ong2024routellm} estende il paradigma con un \emph{router appreso}: 
+un classificatore addestrato su dati di preferenza umana (derivati da Chatbot Arena) decide 
+se instradare la richiesta verso un modello ``forte'' (più costoso) o ``debole'' (più economico). 
+Gli autori confrontano quattro approcci di routing (Matrix Factorization, BERT classifier, Causal LLM, Similarity-Weighted Ranking) 
+su benchmark standard (MMLU, MT-Bench).
+
+Il router di Orion si posiziona in questo quadro come un \emph{LLM-based router}: 
+la decisione di routing è affidata a un modello di linguaggio (Gemini Flash) con output strutturato, non a un modello appreso. 
+Rispetto a RouteLLM, il vantaggio è la flessibilità (aggiungere un nuovo agente richiede l'aggiornamento del prompt, non il riaddestramento); 
+lo svantaggio è il costo di una chiamata LLM per ogni richiesta, anche se mitigato dalla scelta di un modello veloce ed economico.
+
+% =====================================================================
+\section{Stima dell'incertezza e confidence calibration}
+\label{sec:bg-confidence}
+% =====================================================================
+
+La capacità di un LLM di ``sapere di non sapere'' è un requisito fondamentale per il meccanismo di clarification di Orion. 
+Kadavath et al.~\cite{kadavath2022knowsknows} mostrano che i modelli di grande scala sono ``ragionevolmente'' calibrati quando interrogati esplicitamente sulla propria certezza: 
+la probabilità espressa dal modello correla con la probabilità effettiva di risposta corretta, specialmente per le domande a risposta multipla. 
+La calibrazione è tuttavia peggiore su domande aperte e su domini non visti in addestramento.
+
+L'\emph{active prompting}~\cite{diao2023activeprompting} combina Chain-of-Thought con una strategia di selezione attiva: 
+il sistema identifica i casi su cui il modello è più incerto e li sottopone a revisione. 
+Il meccanismo di clarification di Orion è ispirato a questo principio: quando la confidence del router è sotto la soglia, 
+il sistema interroga l'utente invece di procedere con una classificazione incerta.
+
+L'alternativa più robusta è la \emph{self-consistency}~\cite{wang2022selfconsistency}: $N$ generazioni indipendenti 
+con temperatura non nulla, seguite da un voto di maggioranza. 
+L'approccio produce stime di confidenza più affidabili ma moltiplica il costo per $N$; 
+è stato scartato per ragioni di latenza e discusso come direzione futura nel Capitolo~\ref{chap:conclusioni}.
+
+% =====================================================================
+\section{Sicurezza, privacy, compliance}
+\label{sec:bg-security}
+% =====================================================================
+
+La sicurezza di un sistema basato su LLM in contesto enterprise richiede difese a più livelli. 
+Il vettore di attacco più specifico è il \emph{prompt injection}~\cite{perez2022promptinjection}: 
+un input malevolo progettato per far ignorare al modello le istruzioni di sistema e produrre comportamenti non autorizzati. 
+Le difese includono sanitizzazione dell'input, istruzioni di sistema robuste e, nel caso specifico, il servizio Google Cloud Model Armor~\cite{gcp_modelarmor}, 
+che combina classificatori di \emph{Responsible AI} con un rilevatore di prompt injection.
+
+La protezione dei dati personali (PII) è gestita dalla \emph{Sensitive Data Protection} di Google Cloud~\cite{gcp_dlp}, 
+che rileva e può mascherare tipi di dato sensibile (codice fiscale, IBAN, partita IVA nel contesto italiano). 
+La strategia adottata è descritta nella Sez.~\ref{subsec:agenti-security}.
+
+L'European AI Act~\cite{eu2024aiact}, entrato in vigore nell'agosto 2024, impone requisiti di trasparenza, \emph{human oversight} e gestione del rischio per i sistemi AI.
+La suite li soddisfa attraverso: trasparenza del routing (badge che indica l'agente e la complessità), audit trail completo (log strutturati di ogni interazione), 
+controllo umano sulle configurazioni (prompt di sistema modificabile dall'admin panel), e controlli di sicurezza pre e post generazione.
+
+% =====================================================================
+\section{Identity federation}
+\label{sec:bg-identity}
+% =====================================================================
+
+L'autenticazione del progetto è basata su protocolli standard per le applicazioni web enterprise. 
+OAuth~2.0~\cite{rfc6749oauth2} è il framework di autorizzazione che definisce i flussi per ottenere token di accesso; 
+OpenID Connect~\cite{oidc1_0core} estende OAuth con un layer di autenticazione che fornisce informazioni 
+sull'identità dell'utente in un ID token. Il token è un JSON Web Token (JWT)~\cite{rfc7519jwt}, 
+un oggetto firmato crittograficamente che contiene i \emph{claim} dell'utente (identità, ruoli, gruppi).
+
+Microsoft Entra ID~\cite{msft_entra_id} è l'implementazione concreta adottata dall'organizzazione: 
+il \emph{tenant} identitario federato che gestisce l'identità di tutti i dipendenti. 
+La libreria client MSAL~\cite{msft_msal} gestisce il flusso \emph{Authorization Code + PKCE} nel browser, 
+acquisisce il token e lo rende disponibile alle applicazioni. 
+Nella suite, il portale utilizza MSAL per autenticare l'utente, ottenere un token con i claim del profilo (nome, ruolo, direzione) 
+e il GUID del gruppo AD, e propagarlo alle sotto-applicazioni attraverso il session storage del browser.
+
+% =====================================================================
+\section{Infrastruttura cloud}
+\label{sec:bg-cloud}
+% =====================================================================
+
+L'intera suite è ospitata su Google Cloud Platform e fa uso di servizi managed per minimizzare il carico operativo.
+
+\begin{description}
+  \item[Cloud Run~\cite{gcp_cloudrun}.] Piattaforma serverless che esegue container Docker senza gestione di VM. 
+  Ogni componente del progetto (backend e frontend di ciascun agente, portali utente, pannelli di amministrazione) è un container indipendente 
+  con scalabilità automatica (da zero a $N$ istanze) e fatturazione ``al secondo di utilizzo'', che può quindi scalare a 0 in momento di uso nullo.
+
+  \item[Cloud SQL~\cite{gcp_cloudsql}.] Database PostgreSQL managed con backup automatici e connessione privata tramite Private Service Connect. 
+  Ospita i dati applicativi di tutti gli agenti (utenti, conversazioni, messaggi, configurazioni).
+
+  \item[BigQuery~\cite{gcp_bigquery}.] Data warehouse serverless utilizzato dagli agenti Text-to-SQL (AllyCare e SysAid) come motore analitico. 
+  I dataset sono alimentati da flussi ETL che, pur essendo stati realizzati dallo stesso autore, non sono trattati nella tesi.
+
+  \item[Vertex AI~\cite{gcp_vertexai}.] Piattaforma ML managed che fornisce accesso alle API dei modelli (Gemini~\cite{team2024gemini}, Claude~\cite{anthropic2024claude} via AnthropicVertex), 
+  il RAG Engine~\cite{gcp_vertex_rag} per l'indicizzazione e il retrieval di documenti, e il servizio di Grounding with Google Search~\cite{gcp_grounding}.
+  (Nota: ha di recente cambiato nome in ``Agent Platform'', nel contesto di questo documento sarà comunque citato sempre come ``Vertex AI'')
+
+  \item[Terraform~\cite{terraform_docs}.] Strumento di Infrastructure-as-Code che descrive l'intera infrastruttura GCP in file dichiarativi (\texttt{.tf}). 
+  Ogni risorsa (servizi Cloud Run, trigger Cloud Build, istanza Cloud SQL, bilanciatore di carico, policy IAM, segreti...) è versionata e riproducibile.
+
+  \item[FastAPI~\cite{fastapi_docs}.] Framework Python asincrono scelto per tutti i backend. 
+  La scelta è motivata dalla natura I/O bound delle interazioni con gli LLM: il modello di concorrenza \texttt{async/await} 
+  consente di sostenere centinaia di richieste concorrenti per istanza senza thread multipli.
+  
+\end{description}

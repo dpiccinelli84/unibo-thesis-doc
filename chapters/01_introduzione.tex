@@ -1,0 +1,187 @@
+% !TEX root = ../main.tex
+% =====================================================================
+% CAPITOLO 1 — INTRODUZIONE
+% =====================================================================
+
+\chapter{Introduzione}
+\label{chap:introduzione}
+
+% =====================================================================
+\section{Il contesto: dall'entusiasmo per gli LLM al problema dell'adozione enterprise}
+\label{sec:contesto}
+% =====================================================================
+
+Il rilascio pubblico di ChatGPT nel novembre 2022 ha segnato l'inizio di una notevole adozione individuale dell'AI generativa: 
+in meno di due mesi il servizio ha raggiunto 100~milioni di utenti, e nel giro di un anno strumenti basati su Large Language Model (LLM) 
+sono entrati nella routine quotidiana di milioni di professionisti per la generazione di testi, 
+l'analisi di documenti, la scrittura di codice e la risposta a domande più o meno complesse.
+
+L'adozione \emph{enterprise}, tuttavia, ha seguito un percorso diverso, lento e incerto, 
+principalmente a causa di queste criticità:
+
+\paragraph{Costo.} Le licenze SaaS dei principali fornitori di AI generativa sono tariffate per utente. 
+Per un'organizzazione con migliaia di dipendenti, il costo cumulativo di licenze nominali può raggiungere
+decine e centinaia di migliaia di euro annui (anche alla luce dei prezzi che, con l'evolversi dei modelli, sembrano stare gradualmente crescendo), 
+un investimento difficile da giustificare quando l'utilizzo effettivo dipende dall'approccio personale e rischia di essere limitato a una frazione della popolazione aziendale.
+Inoltre il ritorno sull'investimento è ancora incerto e di difficile stima.
+
+\paragraph{Sovranità del dato.} Le soluzioni pubbliche processano i dati dell'utente sui server del fornitore che possono trovarsi in data center non europei. 
+Per le organizzazioni soggette al GDPR e, dal 2024, all'European AI Act~\cite{eu2024aiact}, la questione di \emph{dove} i dati vengono elaborati e \emph{chi} può accedervi è un vincolo 
+rilevante.
+
+\paragraph{Affidabilità.} I modelli generativi soffrono del fenomeno dell'\emph{allucinazione}: 
+possono produrre affermazioni plausibili e ben formulate ma fattualmente false o errate~\cite{xu2024hallucination}. 
+In un contesto aziendale, un'informazione errata su una procedura, un dato finanziario 
+o un obbligo contrattuale può avere conseguenze concrete con effetti potenzialmente imprevedibili. 
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[height=0.85\textheight,keepaspectratio]{imbuto}
+    \caption[Imbuto narrativo della tesi]{Imbuto narrativo: dal contesto generale dell'adozione enterprise dell'AI generativa ai contributi specifici di questo lavoro.}
+    \label{fig:imbuto_narrativo}
+\end{figure}
+
+% =====================================================================
+\section{Tre modi di ancorare un LLM alla realtà aziendale}
+\label{sec:grounding-tre-modi}
+% =====================================================================
+
+La risposta al problema dell'allucinazione è il \emph{grounding}: l'ancoraggio della generazione del modello a fonti esterne verificabili, 
+che forniscono al modello il contesto necessario per produrre risposte accurate. Il grounding opera a livello di inferenza (non modifica i pesi del modello) 
+e si presenta in tre forme, ciascuna adeguata a un diverso tipo di fonte.
+
+\paragraph{Web grounding.} Il modello accede ai risultati di un motore di ricerca per integrare informazioni attuali e pubbliche nella risposta.
+
+\paragraph{Retrieval-Augmented Generation (RAG).} La domanda dell'utente è utilizzata per recuperare frammenti di documenti da un corpus indicizzato~\cite{lewis2020rag}; 
+il modello genera la risposta vincolandosi a quel materiale.
+
+\paragraph{Text-to-SQL.} La domanda è tradotta in una query SQL eseguita su un data warehouse; i risultati diventano il contesto per la generazione~\cite{yu2018spider,pourreza2023dinsql}.
+
+I tre meccanismi sono descritti in dettaglio nel Capitolo~\ref{chap:background} (Sez.~\ref{sec:bg-grounding}).
+
+La combinazione di queste tre tecniche di grounding \emph{all'interno di una stessa organizzazione} con l'ausilio di agenti specializzati per ciascun contesto 
+e un meccanismo di coordinamento che li integri è una questione meno presente in letteratura, e costituisce il cuore di questa tesi.
+
+% =====================================================================
+\section{Il caso di studio}
+\label{sec:caso-studio}
+% =====================================================================
+
+Il lavoro è stato svolto per intero nel contesto aziendale di
+\href{https://www.coopalleanza3-0.it}{Coop Alleanza 3.0}, la 
+\href{https://it.wikipedia.org/wiki/Coop_Alleanza_3.0}{più grande cooperativa di consumatori} del sistema Coop.
+Lo stack IT dell'organizzazione comprende Google Cloud Platform come piattaforma cloud principale, 
+Microsoft Entra ID come tenant identitario e SysAid come sistema di ticketing IT.
+
+Per le ragioni citate (controllo dei costi, sovranità del dato, desiderio di avere una impronta etica che attenui il bias), è stato deciso dalla Cooperativa
+di procedere con lo sviluppo di strumenti interni che consentano di sfruttare l'AI generativa alle proprie condizioni.
+
+La domanda progettuale che ne deriva è: \emph{come si costruisce una piattaforma di AI generativa enterprise eterogenea, affidabile, economicamente sostenibile e sotto il pieno controllo dell'organizzazione?}
+
+% =====================================================================
+\section{Contributo e approccio}
+\label{sec:contributi}
+% =====================================================================
+
+La tesi sostiene che la risposta è un'architettura ad \emph{agenti verticali specializzati}, 
+ciascuno con la propria forma di grounding e il proprio dominio di competenza, 
+\emph{coordinati da un orchestratore intelligente} 
+che instrada dinamicamente le richieste dell'utente verso l'agente più appropriato.
+
+I contributi specifici sono tre:
+
+\begin{enumerate}
+  \item \textbf{Progettazione e implementazione di una suite di agenti verticali su GCP.} 
+  Quattro agenti specializzati: 
+  Vera (generalista con Web grounding e RAG per-utente), CooPolicy (RAG su corpus documentale condiviso), 
+  AllyCare (Text-to-SQL su dati NPS), SysAid (Text-to-SQL unificato con due fornitori di LLM) realizzati su infrastruttura cloud-native
+  e dotati di autenticazione federata, catena di sicurezza e pipeline CI/CD. 
+  Capitoli~\ref{chap:agenti-architettura} e~\ref{chap:agenti-implementazione}.
+
+  \item \textbf{Progettazione, implementazione e valutazione dell'orchestrazione.} 
+  Un orchestratore LLM-based che instrada le richieste sulla base di una stima di intento, complessità e confidenza, 
+  con meccanismo di clarification quando l'ambiguità è alta. 
+  La capacità generalista di Vera confluisce in Orion come opzione \texttt{self} (gestione delle richieste non specialistiche e fallback): 
+  il router instrada quindi tra \texttt{self}, \texttt{sysaid}, \texttt{allycare} e \texttt{coopolicy}. 
+  Capitoli~\ref{chap:orion-architettura} e~\ref{chap:orion-implementazione}.
+
+  \item \textbf{Una metodologia di valutazione del routing.} 
+  Basata su un gold standard configurabile e su un system prompt adattabile
+  tramite interfaccia grafica per velocizzare le iterazioni e valutare velocemente
+  le variazioni di performance.
+  Capitolo~\ref{chap:orion-valutazione}.
+\end{enumerate}
+
+L'approccio si colloca nel filone della letteratura sui sistemi 
+multi-agente basati su LLM~\cite{wu2023autogen,guo2024multiagent} 
+e sul routing LLM~\cite{ong2024routellm}, con la specificità di un'implementazione 
+completa e collocata in un contesto reale.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.7\textwidth,height=0.85\textheight,keepaspectratio]{contributi}
+    \caption[Sintesi visuale dei contributi della tesi]{Sintesi visuale dei tre contributi: suite di agenti verticali, orchestratore, metodologia di valutazione del routing.}
+    \label{fig:contributi_sintesi}
+\end{figure}
+
+% =====================================================================
+\section{Cosa questa tesi \emph{non} è}
+\label{sec:non-e}
+% =====================================================================
+
+È utile delimitare il perimetro del lavoro svolto e delle scelte fatte:
+
+\begin{itemize}
+  \item Questa tesi \textbf{non propone una nuova architettura di modello}. 
+  I modelli utilizzati (Gemini, Claude) 
+  sono servizi gestiti erogati da fornitori commerciali; il lavoro si concentra sul modo 
+  in cui sono utilizzati, orchestrati e valutati.
+
+  \item Questa tesi \textbf{non propone un nuovo algoritmo di routing appreso}. 
+  Il routing in Orion è LLM-based (un modello che classifica le richieste), 
+  non un classificatore addestrato su dati di preferenza. 
+  L'alternativa appresa è discussa come direzione futura.
+
+  \item Questa tesi \textbf{non sostiene che l'architettura proposta sia universalmente la risposta giusta}. 
+  Mostra che lo è \emph{in questo contesto}, alla luce degli specifici vincoli esposti.
+
+\end{itemize}
+
+% =====================================================================
+\section{Struttura della tesi}
+\label{sec:struttura}
+% =====================================================================
+
+La tesi è organizzata in otto capitoli.
+
+Il \textbf{Capitolo~\ref{chap:background}} introduce i concetti necessari per apprezzare i contributi: 
+architettura Transformer, capacità e limiti degli LLM, prompt engineering e output strutturato, 
+grounding nelle tre forme (Web, RAG, Text-to-SQL), 
+architetture multi-agente, LLM routing, stima dell'incertezza, sicurezza e compliance, 
+identity federation e infrastruttura cloud.
+
+Il \textbf{Capitolo~\ref{chap:agenti-architettura}} presenta i principi guida 
+e le scelte architetturali della suite di agenti verticali: 
+principi etici, governance, agnosticità, sovranità del dato, 
+modularità verticale, automazione dei rilasci e controllo degli accessi.
+
+Il \textbf{Capitolo~\ref{chap:agenti-implementazione}} descrive l'implementazione della suite: 
+stack tecnologico, organizzazione multi-repository, infrastruttura Terraform, 
+pipeline CI/CD, catena di sicurezza e dettagli implementativi dei quattro agenti.
+
+Il \textbf{Capitolo~\ref{chap:orion-architettura}} presenta l'architettura dell'orchestratore: motivazione, 
+routing step con output strutturato, logica di confidence e clarification, 
+agent proxy, gestione dell'identità e della storia conversazionale.
+
+Il \textbf{Capitolo~\ref{chap:orion-implementazione}} descrive l'implementazione dell'orchestratore: 
+router agent, agent proxy, endpoint di chat con routing integrato, 
+frontend con badge trasparente, admin panel con pagina di valutazione, 
+infrastruttura Terraform e schema del database.
+
+Il \textbf{Capitolo~\ref{chap:orion-valutazione}} presenta la valutazione sperimentale su tre piani: 
+il routing dell'orchestratore (domande di ricerca, gold standard, metriche dichiarate a priori, 
+risultati e iterazione del prompt, analisi degli errori e limiti), 
+la qualità dei sub-agenti (execution accuracy per gli agenti Text-to-SQL e faithfulness per il RAG) 
+e una valutazione economica a ordini di grandezza.
+
+Il \textbf{Capitolo~\ref{chap:conclusioni}} sintetizza i contributi, discute la generalizzabilità del pattern e presenta le direzioni di sviluppo futuro.

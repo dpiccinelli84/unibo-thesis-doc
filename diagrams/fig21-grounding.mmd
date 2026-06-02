@@ -1,0 +1,16 @@
+flowchart TB
+    subgraph WG["Web grounding · Vera"]
+        direction LR
+        Q1["Domanda"] --> S1["Google Search"] --> O1["Risposta con<br/>citazioni web"]
+    end
+    subgraph RG["RAG · CooPolicy / Vera"]
+        direction LR
+        Q2["Domanda"] --> S2["Corpus documentale<br/>indicizzato"] --> O2["Risposta con<br/>citazioni ai documenti"]
+    end
+    subgraph TS["Text-to-SQL · AllyCare / SysAid"]
+        direction LR
+        Q3["Domanda"] --> S3["Query SQL su<br/>data warehouse"] --> O3["Risposta con<br/>dati tabellari"]
+    end
+
+    WG ~~~ RG
+    RG ~~~ TS

@@ -45,8 +45,13 @@
     backgroundcolor=\color{gray!10},
     keywordstyle=\color{blue},
     commentstyle=\color{green!60!black},
-    stringstyle=\color{orange}
+    stringstyle=\color{orange},
+    % listings non gestisce nativamente l'UTF-8 multibyte: mappa gli accentati
+    literate={à}{{\`a}}1 {è}{{\`e}}1 {é}{{\'e}}1 {ì}{{\`i}}1 {í}{{\'i}}1
+             {ò}{{\`o}}1 {ó}{{\'o}}1 {ù}{{\`u}}1 {ú}{{\'u}}1 {À}{{\`A}}1
+             {È}{{\`E}}1 {É}{{\'E}}1 {Ì}{{\`I}}1 {Ò}{{\`O}}1 {Ù}{{\`U}}1
 }
+\renewcommand{\lstlistingname}{Listato}
 
 % ── INTESTAZIONI ──────────────────────────────
 \usepackage{fancyhdr}
@@ -98,11 +103,11 @@
 \vspace{10mm}
 
 \begin{minipage}[t]{0.40\textwidth}
-{\Large{\bf Relatore: \\ (da definire)}}
+{\Large{\bf Relatore: \\ Chiar.mo Prof.\\ Maurizio Gabbrielli}}
 \vspace{5mm}
 
-% se hai un correlatore decommentare:
-% {\Large{\bf Correlatore: \\ Chiar.mo Prof.\\ Nome Cognome}}
+% TODO F0.1: verificare i titoli accademici dei correlatori
+{\Large{\bf Correlatori: \\ Saverio Giallorenzo \\ Bianca Raimondi}}
 \end{minipage}
 \hfill
 \begin{minipage}[t]{0.40\textwidth}\raggedleft
@@ -133,12 +138,10 @@
 
 \input{chapters/01_introduzione}
 \input{chapters/02_background}
-\input{chapters/03_agenti_architettura}
-\input{chapters/04_agenti_implementazione}
-\input{chapters/05_orion_architettura}
-\input{chapters/06_orion_implementazione}
-\input{chapters/07_valutazione}
-\input{chapters/08_conclusioni}
+\input{chapters/03_agenti}
+\input{chapters/04_orion}
+\input{chapters/05_valutazione}
+\input{chapters/06_conclusioni}
 
 % ── BIBLIOGRAFIA ──────────────────────────────
 \printbibliography[heading=bibintoc, title={Bibliografia}]

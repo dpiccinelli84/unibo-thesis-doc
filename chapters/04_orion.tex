@@ -1,0 +1,622 @@
+% !TEX root = ../main.tex
+% =====================================================================
+% CAPITOLO 4 — ORION: L'ORCHESTRATORE
+% (fusione dei precedenti capitoli "architettura" e "implementazione",
+%  revisione giugno 2026 su indicazione dei relatori — vedi
+%  plans/PIANO_REVISIONE_FEEDBACK.md, attività F1)
+% =====================================================================
+
+\chapter{Orion: l'orchestratore}
+\label{chap:orion}
+
+Questo capitolo presenta Orion, l'orchestratore che costituisce il
+contributo conclusivo della tesi. Mentre il Capitolo~\ref{chap:agenti} ha
+descritto la suite di agenti verticali come un insieme di servizi
+indipendenti, ciascuno raggiungibile dall'utente attraverso il portale, qui
+si affronta il problema complementare: come consentire all'utente di
+interagire con \emph{un unico punto di accesso} che instradi automaticamente
+ogni richiesta verso l'agente più competente. Ogni componente
+dell'orchestratore --- routing step, agent proxy, gestione della
+conversazione, frontend, pannello di amministrazione e infrastruttura --- è
+presentato una sola volta, dalle scelte di progetto fino alla realizzazione.
+
+% =====================================================================
+\section{Motivazione e visione architetturale}
+\label{sec:orion-motivazione}
+% =====================================================================
+
+L'approccio ad unico agente orchestratore consente il miglioramento della gestione di queste eventualità:
+
+\paragraph{Errori di selezione.}
+La selezione manuale introduce la possibilità di errore: l'utente sceglie l'agente sbagliato,
+ottiene una risposta fuori dominio o un rifiuto, e deve ricominciare.
+
+
+\paragraph{Richieste ibride.} Nella conversazione naturale, l'utente può passare fluidamente da un argomento
+a un altro: ``Quanti ticket sono aperti oggi? E qual è l'NPS del negozio di Bologna?''.
+Con agenti isolati, questa transizione richiede il cambio manuale di agente.
+
+La visione di Orion è quella di un \emph{orchestratore intelligente} che elimina questi due limiti.
+L'utente interagisce con un'unica interfaccia che analizza la richiesta, ne determina l'intento e la complessità,
+e la inoltra in modo trasparente all'agente specializzato più appropriato.
+Quando Orion non è sufficientemente sicuro della classificazione, pone una domanda di chiarimento prima di procedere,
+in un meccanismo di disambiguazione \emph{human-in-the-loop} ispirato ai principi dell'\emph{active learning}~\cite{settles2012active,diao2023activeprompting}.
+
+Il pattern architetturale di Orion è quello dell'\emph{orchestratore gerarchico} descritto nella letteratura sui sistemi multi-agente basati su
+LLM~\cite{guo2024multiagent}: un \emph{supervisor agent} coordina $K$ agenti specializzati,
+ciascuno con il proprio dominio di competenza, senza che gli agenti interagiscano direttamente tra loro.
+Rispetto ai pattern cooperativi puri~\cite{wu2023autogen,wang2024moa}, l'architettura gerarchica ha il vantaggio
+della semplicità operativa: il flusso è sempre \emph{utente} $\rightarrow$ \emph{router} $\rightarrow$ \emph{un solo agente} $\rightarrow$ \emph{risposta},
+senza negoziazioni tra agenti che complicano il debugging e aumentano la latenza.
+
+% =====================================================================
+\section{Panoramica architetturale}
+\label{sec:orion-panoramica}
+% =====================================================================
+\label{sec:orion-impl-multirepo}
+
+La Fig.~\ref{fig:orion_architettura} riassume la vista d'insieme.
+Una richiesta dell'utente segue un percorso lineare: il \emph{frontend} di Orion
+la inoltra al \emph{backend}, che invoca il \emph{routing step} LLM-based (Sez.~\ref{sec:orion-routing});
+questo seleziona in un solo passo l'agente competente all'interno dell'insieme disponibile (\texttt{self}, \texttt{sysaid}, \texttt{allycare}, \texttt{coopolicy}).
+La richiesta è quindi inoltrata al backend del sub-agente selezionato tramite l'\emph{agent proxy} (Sez.~\ref{sec:orion-proxy}),
+che ne normalizza la risposta prima di restituirla al frontend.
+
+Il valore \texttt{self} non corrisponde a un sub-agente esterno,
+ma alla pipeline generalista interna di Orion (clonata da Vera, vista in precedenza: RAG sui documenti caricati dall'utente, ricerca web e conoscenza parametrica)
+che funge anche da \emph{fallback} quando un sub-agente non è raggiungibile.
+Le sezioni successive approfondiscono i due componenti chiave, il routing step e l'agent proxy,
+preceduti dal posizionamento rispetto ai sistemi affini (Sez.~\ref{sec:orion-related}).
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{orion1}
+    \caption[Architettura di Orion]{Architettura dell'orchestratore Orion: il routing step LLM-based seleziona dinamicamente quale agente specializzato invocare;
+    il proxy normalizza le risposte; la pipeline Vera (RAG + web search) resta come fallback su \texttt{agent == "self"}.}
+    \label{fig:orion_architettura}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.9\textwidth,height=0.9\textheight,keepaspectratio]{diagrammaconorion}
+    \caption[Architettura di sistema con Orion]{La suite nella sua forma finale, all'interno della rete privata di Coop Alleanza:
+    un load balancer interno separa il percorso utente (Orion Frontend $\to$ Orion Backend $\to$ sub-agenti specializzati) dal percorso amministrativo,
+    e tutti i backend condividono l'infrastruttura GCP (Cloud SQL, BigQuery, Secret Manager, Vertex AI con Gemini, Claude, Model Armor e RAG Engine).
+    Evoluzione della Fig.~\ref{fig:architettura_suite} con l'aggiunta dello strato di orchestrazione.}
+    \label{fig:architettura_orion_v2}
+\end{figure}
+
+Sul piano organizzativo, l'introduzione dell'orchestratore completa il
+disegno obiettivo del progetto: ai repository della suite
+(Fig.~\ref{fig:multirepo_tree}) si aggiungono quattro nuovi servizi dedicati
+--- \texttt{orion-backend}, \texttt{orion-frontend},
+\texttt{orion-admin-backend} e \texttt{orion-admin-frontend} --- ciascuno
+con il proprio ciclo di CI/CD e i propri branch per ambiente, secondo lo
+schema multi-repository già descritto (Sez.~\ref{subsec:agenti-multirepo}).
+
+Il backend di Orion è stato sviluppato a partire dal backend di Vera;
+rispetto a Vera, aggiunge tre componenti nuovi: il \emph{router agent},
+il \emph{proxy} verso i sub-agenti e l'endpoint dedicato alla valutazione.
+Tutti gli endpoint utente sono esposti sotto il prefisso \texttt{/api/orion/};
+gli endpoint amministrativi sono serviti da un servizio Cloud Run dedicato (\texttt{orion-admin-backend}),
+descritto nella Sez.~\ref{sec:orion-impl-admin}.
+
+% =====================================================================
+\section{Lavori correlati e posizionamento}
+\label{sec:orion-related}
+% =====================================================================
+
+Prima di descrivere l'architettura nel dettaglio, è utile posizionare Orion rispetto ai principali sistemi di routing
+e orchestrazione di LLM proposti nella letteratura recente.
+
+La Tab.~\ref{tab:orion-related} riassume il confronto lungo cinque dimensioni.
+
+\begin{table}[htbp]
+  \centering
+  \caption[Confronto con i lavori correlati]{Posizionamento di Orion rispetto ai principali sistemi di routing e orchestrazione multi-agente.}
+  \label{tab:orion-related}
+  \small
+  \begin{tabular}{p{2.4cm}p{3cm}p{2.8cm}p{2.3cm}p{2.3cm}}
+    \toprule
+    \textbf{Sistema}   & \textbf{Tipo routing} & \textbf{Aggiunta\newline agenti} & \textbf{Confidence} & \textbf{Grounding} \\
+    \midrule
+    FrugalGPT~\cite{chen2023frugalgpt}
+        & Cascade sequenziale    & Riordinamento coda  & Early-exit implicita  & Non previsto \\
+    RouteLLM~\cite{ong2024routellm}
+        & Classificatore appreso & Riaddestramento     & Non esplicita         & Non previsto \\
+    AutoGen~\cite{wu2023autogen}
+        & Cooperativo (chat)     & Registrazione agente & Non prevista         & A carico agente \\
+    MoA~\cite{wang2024moa}
+        & Competitivo + aggr.    & Aggiunta al pool    & Aggregazione          & Non previsto \\
+    \textbf{Orion}
+        & LLM-based strutturato  & Aggiornamento prompt & Esplicita + clarif.  & Eterogeneo \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\paragraph{Orion vs FrugalGPT.} FrugalGPT~\cite{chen2023frugalgpt}
+formalizza il routing come un \emph{cascade}: i modelli sono ordinati per costo crescente
+e la richiesta scala al modello successivo solo se il precedente non è abbastanza sicuro.
+Orion non è un cascade ma un \emph{router diretto}: il routing step seleziona un singolo agente in un solo passo, senza prove sequenziali.
+Il vantaggio è una latenza prevedibile e indipendente dal numero di agenti; lo svantaggio è che la decisione è irreversibile nel turno.
+
+\paragraph{Orion vs RouteLLM.} RouteLLM~\cite{ong2024routellm} addestra un classificatore su dati
+di preferenza umana per decidere tra un modello forte e uno debole.
+Orion affronta un problema più ampio (selezione tra $K$~agenti eterogenei,
+non tra due modelli) e adotta un router LLM-based anziché appreso. Il trade-off è esplicito:
+flessibilità (aggiungere un agente richiede l'aggiornamento del prompt, non il riaddestramento)
+contro efficienza (una chiamata LLM per ogni richiesta).
+La transizione verso un router appreso è discussa come sviluppo futuro (Sez.~\ref{subsec:concl-routellm}).
+
+\paragraph{Orion vs AutoGen.} AutoGen~\cite{wu2023autogen} implementa un pattern cooperativo in cui gli agenti
+dialogano tra loro attraverso un \texttt{GroupChatManager}. Orion adotta un pattern strettamente gerarchico:
+il flusso unidirezionale già descritto (Sez.~\ref{sec:orion-motivazione}) resta l'unica via,
+senza interazione inter-agente. La semplicità del flusso lineare è un requisito in contesto enterprise,
+dove la tracciabilità di ogni decisione e la prevedibilità della latenza sono prioritarie rispetto alla flessibilità compositiva.
+
+\paragraph{Orion vs Mixture-of-Agents.} MoA~\cite{wang2024moa} sottopone la stessa richiesta a $N$~agenti e aggrega le risposte.
+Orion seleziona un singolo agente, evitando il costo computazionale di $N$~invocazioni parallele.
+L'approccio è giustificato dal fatto che gli agenti della suite operano su fonti dati disgiunte:
+aggregare una risposta RAG con una risposta Text-to-SQL non produrrebbe una risposta migliore, ma solo rumore.
+
+\paragraph{Specificità di Orion.} Due caratteristiche distinguono Orion dai sistemi citati: (i)~l'output
+strutturato del router include un \emph{confidence score} esplicito con soglia configurabile e meccanismo di \emph{clarification},
+implementando una forma di \emph{deferral} basato sull'incertezza, ispirato ai principi dell'\emph{active learning}
+ma operante in fase di inferenza (\emph{human-in-the-loop}) anziché come ciclo di ri-addestramento; (ii)~gli agenti orchestrati utilizzano forme di
+grounding eterogenee (Web, RAG, Text-to-SQL), una dimensione assente nei lavori citati,
+che si concentrano sulla selezione del modello piuttosto che sulla selezione della \emph{fonte di conoscenza}.
+
+% =====================================================================
+\section{Il routing step: stima di intento, complessità, confidenza}
+\label{sec:orion-routing}
+% =====================================================================
+
+Il cuore di Orion è il \emph{routing step}: un modulo che,
+dato il prompt dell'utente e l'eventuale cronologia della conversazione,
+produce una decisione di instradamento sotto forma di oggetto strutturato.
+La scelta di delegare il routing a un LLM, anziché a un classificatore addestrato ad hoc,
+è motivata da tre ragioni pratiche: (i)~il set di agenti target evolve nel tempo
+ e non si desidera riaddestrare un modello a ogni aggiunta; (ii)~il reasoning esplicito del modello
+ fornisce tracciabilità diagnostica per ogni decisione; (iii)~il costo di una singola chiamata
+ a un modello veloce ed economico (Gemini~2.5 Flash) è trascurabile rispetto al costo
+ della risposta completa dell'agente invocato.
+
+\subsection{Output strutturato del router}
+\label{subsec:orion-output-strutturato}
+
+Il router produce un oggetto JSON vincolato,
+utilizzando il meccanismo di \emph{guided generation}~\cite{willard2023outlines} offerto dall'API di
+Vertex AI (\texttt{response\_mime\_type = "application/json"} con \texttt{response\_schema} esplicito).
+Lo schema, definito dal modello Pydantic che valida l'output della funzione
+\texttt{classify} (Sez.~\ref{subsec:orion-impl-router}), è il seguente:
+
+\begin{lstlisting}[language=Python,caption={Schema dell'output strutturato del router e firma della funzione \texttt{classify}.},label={lst:classify-signature}]
+class RouterOutput(BaseModel):
+    agent: str        # "self" | "sysaid" | "allycare" | "coopolicy"
+    complexity: str   # "low" | "high"
+    confidence: float # 0.0 .. 1.0
+    reasoning: str    # Chain-of-Thought esplicita
+    clarification_needed: Optional[str] = None
+
+async def classify(
+    prompt: str,
+    history: list,
+    available_agents: list[str],
+) -> RouterOutput:
+\end{lstlisting}
+
+Ogni campo assolve a una funzione precisa:
+
+\begin{description}
+  \item[\texttt{agent}] Identificatore dell'agente target.
+  Il campo è vincolato a un'\texttt{enum} contenente i soli agenti disponibili per l'utente corrente,
+  garantendo che il modello non possa inventare target inesistenti.
+  Il valore \texttt{"self"} indica che Orion gestisce la richiesta internamente
+  (RAG su documenti caricati dall'utente, ricerca web, conoscenza parametrica).
+
+  \item[\texttt{complexity}] Stima binaria della complessità della richiesta: \texttt{"low"} per domande dirette,
+  conteggi semplici, filtri base; \texttt{"high"} per analisi multi-dimensionali, correlazioni,
+  confronti temporali articolati, report executive.
+  La complessità non influenza la scelta dell'agente ma è propagata al sub-agente nel
+  payload della richiesta, che la utilizza per il proprio \emph{model routing} interno (cfr. Sez.~\ref{subsec:agenti-sysaid-confronto}),
+  realizzando il trade-off costo--qualità descritto nella Sez.~\ref{sec:bg-routing}.
+
+  \item[\texttt{confidence}] Valore numerico nell'intervallo $[0, 1]$
+  che esprime la certezza del router nella classificazione effettuata.
+  Il campo è il fondamento del meccanismo di \emph{clarification} descritto nella sezione successiva.
+
+  \item[\texttt{reasoning}] Catena di ragionamento esplicita (\emph{Chain-of-Thought}~\cite{wei2022cot})
+  che il modello è istruito a produrre prima della decisione.
+  Il campo non viene mostrato all'utente ma è persistito nel log di routing e
+  consultabile dall'amministratore attraverso il pannello di amministrazione,
+  abilitando un ciclo di miglioramento continuo del prompt.
+
+  \item[\texttt{clarification\_needed}] Domanda di chiarimento da porre all'utente quando la confidence è insufficiente.
+  Quando valorizzato, il routing non procede: Orion restituisce la domanda all'utente e
+  attende un nuovo turno conversazionale prima di classificare nuovamente.
+
+\end{description}
+
+\subsection{Logica di confidence e clarification}
+\label{subsec:orion-confidence}
+
+La \emph{confidence} prodotta dal router governa il comportamento del
+sistema secondo una logica a soglia configurabile.
+La soglia di default, \texttt{ROUTER\_CONFIDENCE\_THRESHOLD}, è impostata a 0,60 (modificabile):
+
+\begin{itemize}
+  \item Se $\text{confidence} \geq \text{threshold}$, il routing procede normalmente: la richiesta è inoltrata all'agente selezionato.
+  \item Se $\text{confidence} < \text{threshold}$, il routing è sospeso. Se il modello ha già proposto una domanda di chiarimento (\texttt{clarification\_needed} non nullo), essa viene restituita all'utente. In caso contrario, il sistema genera automaticamente una richiesta di disambiguazione generica.
+\end{itemize}
+
+La calibrazione del confidence score, la proprietà per cui il modello è
+più incerto quando sbaglia e più sicuro quando ha ragione, non è banale;
+la letteratura mostra che i modelli di grande scala sono ``ragionevolmente'' calibrati quando interrogati
+esplicitamente sulla propria certezza~\cite{kadavath2022knowsknows}, ma la calibrazione peggiora su domini
+specifici non visti in addestramento. Il Capitolo~\ref{chap:orion-valutazione} verifica empiricamente questa proprietà sul dominio del progetto.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[height=0.85\textheight,keepaspectratio]{orion2}
+    \caption[Routing decision flow]{Logica di routing: in funzione della soglia di confidenza configurabile, Orion instrada direttamente oppure pone all'utente una domanda di chiarimento.}
+    \label{fig:routing_decision}
+\end{figure}
+
+\subsection{Scelta del modello per il routing}
+\label{subsec:orion-model-routing}
+
+Il modello utilizzato per il routing step è Gemini~2.5 Flash~\cite{team2024gemini}.
+La scelta è motivata da tre fattori:
+
+\begin{enumerate}
+  \item \textbf{Latenza.} Il routing step aggiunge latenza all'intera pipeline:
+  il tempo trascorso tra la richiesta dell'utente e l'inizio della risposta è la somma della latenza del router e della latenza dell'agente.
+  Con Gemini Flash, il modello più rapido della famiglia, la latenza aggiunta dal routing step è contenuta e trascurabile rispetto al tempo di generazione della risposta completa dell'agente.
+  \item \textbf{Costo.} Il router è chiamato su \emph{ogni} richiesta utente. Un modello più potente (ad esempio Gemini~2.5 Pro o Claude Sonnet) avrebbe un costo unitario superiore,
+  che moltiplicato per il volume di traffico rischia di diventare impattante.
+  \item \textbf{Capacità sufficiente.} Il task del router è una classificazione
+  vincolata su un set chiuso di $K$~etichette (quattro agenti + la variabile di complessità), con ragionamento esplicito.
+  Un modello ``flash'' dovrebbe sempre essere sufficiente per questo tipo di compito,
+  come confermato dai risultati sperimentali del Capitolo~\ref{chap:orion-valutazione}.
+\end{enumerate}
+
+L'alternativa di un router appreso, come RouteLLM~\cite{ong2024routellm} (Sez.~\ref{sec:bg-routing}),
+è stata valutata come possibile evoluzione futura una volta che il sistema
+sarà passato in produzione a tutti gli effetti, con l'aumento del volume di traffico
+che potrebbe generare un dataset di training significativo.
+
+\subsection{La funzione \texttt{classify}}
+\label{subsec:orion-impl-router}
+
+Il modulo \texttt{router\_agent.py} implementa il routing step nella funzione
+asincrona \texttt{classify}, che riceve tre parametri: il prompt dell'utente,
+la cronologia della conversazione (ultimi sei turni) e la lista degli agenti
+disponibili. Il processo di classificazione si articola in quattro fasi:
+
+\begin{enumerate}
+  \item \textbf{Costruzione del prompt.} Il sistema compone il prompt completo
+  concatenando il \emph{system prompt} del router (che descrive le regole di classificazione,
+  la semantica della confidence e le istruzioni per il reasoning),
+  il blocco descrittivo degli agenti disponibili (nome, descrizione, esempi di richieste tipiche per ciascuno)
+  e il prompt dell'utente. La cronologia della conversazione è inclusa in forma sintetica
+  (ultimi sei turni, ciascuno troncato a 200~caratteri, configurabile) per consentire al modello di risolvere
+  riferimenti incrociati nei turni di \emph{follow-up}.
+
+  \item \textbf{Chiamata a Vertex AI con output strutturato.} La funzione invoca Gemini~2.5 Flash
+  attraverso il client \texttt{google.genai}, configurato con \texttt{temperature = 0.1} (più deterministico),
+  \texttt{max\_output\_tokens = 1024} e il vincolo di \emph{guided generation} sullo schema
+  già descritto (Sez.~\ref{subsec:orion-output-strutturato}), con l'\texttt{enum} del campo
+  \texttt{agent} ristretta ai soli agenti passati come parametro.
+
+  \item \textbf{Parsing e validazione.} La risposta JSON viene parsificata e
+  validata attraverso il modello Pydantic \texttt{RouterOutput}.
+  Se l'agente restituito non è nella lista degli agenti disponibili (possibile in caso di allucinazione residua nonostante lo schema),
+  il sistema effettua un \emph{fallback} su \texttt{"self"}. Se la confidence è inferiore alla soglia configurata e il modello non ha proposto una domanda di chiarimento,
+  il sistema ne genera una automaticamente.
+
+  \item \textbf{Logging.} La decisione di routing viene loggata con livello \texttt{INFO}
+  se la confidence è $\geq 0{,}80$, \texttt{WARNING} altrimenti. Il log include agente selezionato, complessità,
+  confidence e flag di clarification, e alimenta la pagina \emph{Routing Logs} del pannello di amministrazione.
+\end{enumerate}
+
+In caso di eccezione durante la classificazione (errore di rete, timeout verso Vertex AI, errore di parsing),
+il modulo restituisce un \emph{fallback deterministico}: \texttt{agent = "self"}, \texttt{confidence = 1.0},
+con un reasoning che documenta l'errore.
+
+\paragraph{Endpoint di valutazione.}
+\label{subsec:orion-impl-classify}
+L'endpoint \texttt{POST /api/orion/classify} espone il solo routing step, senza eseguire la risposta dell'agente selezionato.
+Riceve un prompt e una storia opzionale, e restituisce l'output strutturato del router.
+L'endpoint è stato progettato specificamente per il framework di valutazione descritto nel Capitolo~\ref{chap:orion-valutazione}:
+testare il router in isolamento consente di eseguire centinaia di test case con il costo di una sola chiamata Flash per test case, senza attivare i sub-agenti.
+
+% =====================================================================
+\section{Agent proxy e normalizzazione delle risposte}
+\label{sec:orion-proxy}
+% =====================================================================
+\label{subsec:orion-impl-proxy}
+
+Una volta che il router ha selezionato l'agente target, il \emph{proxy} di Orion inoltra
+la richiesta al backend del sub-agente via HTTP e normalizza la risposta prima di restituirla al frontend.
+Il proxy è il componente che rende trasparente al frontend l'eterogeneità dei sub-agenti:
+ogni agente ha il proprio formato di risposta (SysAid include query SQL e grafici base64; CooPolicy include citazioni con URI ai documenti; AllyCare include tabelle dati),
+e il proxy li mappa verso una \emph{shape} uniforme.
+
+Il modulo \texttt{agent\_proxy.py} implementa questa logica nella funzione
+\texttt{forward}. La tabella degli endpoint è configurata tramite variabili
+d'ambiente, una per ciascun sub-agente:
+
+\begin{table}[htbp]
+  \centering
+  \caption[Mapping degli endpoint dei sub-agenti]{Mapping tra agente target, variabile d'ambiente per l'URL del backend e path dell'endpoint.}
+  \label{tab:agent-endpoints}
+  \begin{tabular}{lll}
+    \toprule
+    \textbf{Agent key} & \textbf{Env var}             & \textbf{Path} \\
+    \midrule
+    \texttt{sysaid}    & \texttt{SYSAID\_BACKEND\_URL} & \texttt{/api/sysaid/prompt} \\
+    \texttt{allycare}  & \texttt{NPS\_BACKEND\_URL}    & \texttt{/api/nps/prompt} \\
+    \texttt{coopolicy} & \texttt{DOCS\_BACKEND\_URL}   & \texttt{/api/docs/prompt} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Il payload inviato al sub-agente contiene, oltre al prompt e alla cronologia,
+i campi \texttt{complexity}, \texttt{user\_name}, \texttt{user\_role} e \texttt{user\_direction},
+consentendo al sub-agente di personalizzare la risposta senza dover decodificare un token JWT.
+
+Le decisioni architetturali rilevanti del proxy sono quattro.
+
+\paragraph{Nessuna modifica ai backend dei sub-agenti.} Il proxy si adatta al contratto API esistente di ogni sub-agente,
+senza richiedere modifiche ai loro endpoint. Questo principio preserva la stabilità degli agenti già in produzione e la compatibilità.
+
+\paragraph{Autenticazione service-to-service.} I sub-agenti non ricevono il token Entra ID dell'utente:
+L'autenticazione fra i backend è gestita semplicemente fornendo al service account del backend di Orion il permesso di invocare gli altri servizi.
+Le informazioni dell'utente (nome, ruolo, direzione), necessarie ai sub-agenti per personalizzare le risposte,
+sono propagate come campi nel payload JSON della richiesta.
+Questo approccio elimina la eventuale complessità del \emph{token forwarding}.
+
+\paragraph{Normalizzazione delle risposte.} Il proxy riceve dalla risposta del sub-agente un JSON
+con campi eterogenei e lo trasforma, nella funzione \texttt{\_normalize\_response},
+in un oggetto \texttt{OrionProxyResponse} con una struttura fissa.
+I campi opzionali (\texttt{queries}, \texttt{charts}, \texttt{sources}, \texttt{data})
+sono valorizzati solo se presenti nella risposta del sub-agente,
+consentendo al frontend di adattare il rendering in base all'agente che ha
+prodotto la risposta (Sez.~\ref{subsec:orion-impl-fe-shapes}).
+Un caso particolarmente significativo è la normalizzazione delle citazioni di CooPolicy: gli URI dei documenti,
+originariamente nel formato \texttt{gs://bucket/file.pdf}, vengono riscritti come \texttt{/api/orion/docs/file?uri=...},
+un percorso relativo che il frontend può aprire direttamente e che viene servito da un proxy autenticato verso GCS montato nel backend di Orion.
+
+\paragraph{Gestione degli errori e fallback.} Se il sub-agente risponde con un codice di errore (4xx, 5xx)
+o non risponde entro il timeout di 120~secondi, il proxy restituisce un messaggio di errore leggibile e il flag \texttt{error = true}.
+Il frontend rileva il flag e può mostrare all'utente un messaggio appropriato. In alternativa,
+il flusso può ricadere sulla pipeline interna di Orion (\texttt{agent = "self"}).
+
+\paragraph{Streaming bufferizzato.} Il proxy attende la risposta completa del sub-agente
+prima di inoltrarla al frontend via \emph{Server-Sent Events} (SSE).
+La scelta semplifica la normalizzazione al costo di un \emph{time-to-first-token}
+pari alla latenza dell'intero sub-agente; l'evoluzione verso uno streaming \emph{pass-through} è una possibile evolutiva architetturale (Tab.~\ref{tab:orion-decisioni}).
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{orion3}
+    \caption[Sequence diagram di un turno Orion]{Sequence diagram completo: dalla richiesta utente al routing, dall'invocazione del sub-agente alla normalizzazione della risposta.}
+    \label{fig:orion_sequence}
+\end{figure}
+
+% =====================================================================
+\section{Conversation threading e gestione della storia}
+\label{sec:orion-history}
+% =====================================================================
+
+Orion mantiene una \emph{storia unica} per conversazione: tutti i turni, indipendentemente dall'agente che li ha serviti, sono memorizzati nella stessa conversazione del database di Orion.
+Questa scelta consente all'utente di cambiare argomento (e quindi agente) all'interno
+della stessa conversazione senza discontinuità percepita.
+
+Il trade-off accettato è che il sub-agente invocato riceve l'intera storia della conversazione,
+inclusi i turni gestiti da altri agenti. Per mitigare il rischio di confusione, la storia inviata al sub-agente
+è troncata agli ultimi sei turni (parametro configurabile) e i messaggi non pertinenti (ad esempio, grafici base64 o citazioni di documenti)
+sono sostituiti con un riassunto testuale sintetico. Il router stesso riceve la storia per
+migliorare la classificazione dei turni di follow-up: se l'utente ha appena chiesto informazioni sui ticket IT,
+una domanda successiva come ``E quanti ne sono stati chiusi?'' viene correttamente instradata a SysAid anche in assenza di parole chiave esplicite.
+
+% =====================================================================
+\section{Integrazione nel flusso di chat e sicurezza}
+\label{subsec:orion-impl-chat}
+% =====================================================================
+
+L'endpoint SSE \texttt{/api/orion/chat/stream} è il punto di ingresso per le richieste dell'utente.
+Il flusso, rispetto a Vera, aggiunge un passo di routing dopo i controlli di quota e di sicurezza e prima della generazione:
+
+\begin{enumerate}
+  \item Verifica quota token dell'utente.
+  \item Sanitizzazione del prompt (Model Armor).
+  \item \textbf{[Nuovo]} Chiamata a \texttt{router\_agent.classify()}.
+  \item \textbf{[Nuovo]} Logging della decisione in \texttt{orion\_routing\_logs}.
+  \item Se \texttt{clarification\_needed}: ritorno della domanda all'utente, fine del turno.
+  \item Se \texttt{agent != "self"}: chiamata a \texttt{agent\_proxy.forward()}, ritorno della risposta normalizzata.
+  \item Se \texttt{agent == "self"} e la conversazione ha documenti caricati: pipeline RAG interna (Gemini Context Caching).
+  \item Se \texttt{agent == "self"} senza documenti: pipeline generalista (ricerca web, conoscenza parametrica, streaming SSE).
+\end{enumerate}
+
+La Fig.~\ref{fig:security_chain_orion} visualizza il flusso completo come evoluzione della
+catena di sicurezza di Vera (Fig.~\ref{fig:security_chain}): il \emph{routing step} si innesta fra il
+controllo di sicurezza sul prompt e la generazione.
+Le tre diramazioni del router riconfluiscono prima della sanitizzazione dell'output, così che ogni risposta,
+inclusa quella prodotta da un sub-agente, attraversi i medesimi controlli post-generazione e lo stesso audit della pipeline originaria.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.95\textwidth,height=0.9\textheight,keepaspectratio]{flusso-prompt-full-orion}
+    \caption[Catena di sicurezza e routing di Orion]{Il flusso completo di una richiesta in Orion: verifica della quota, sanitizzazione del prompt tramite Model Armor
+    (RAI, prompt injection, DLP) con esenzioni per gruppo, \emph{routing step} che instrada verso la pipeline interna, un sub-agente specializzato oppure una richiesta di chiarimento,
+    e infine sanitizzazione dell'output e audit su \texttt{chat\_logs}. Evoluzione della Fig.~\ref{fig:security_chain} con l'aggiunta dello strato di orchestrazione.}
+    \label{fig:security_chain_orion}
+\end{figure}
+
+Il routing step viene eseguito \emph{sempre}, anche in presenza di documenti caricati:
+ciò consente all'utente di porre, nella stessa conversazione, sia domande sui propri documenti sia richieste destinate a un sub-agente.
+La selezione tra la pipeline RAG interna e la pipeline generalista avviene \emph{dopo} il routing, sulla base del campo \texttt{agent} restituito dal router.
+
+% =====================================================================
+\section{Frontend}
+\label{sec:orion-impl-frontend}
+% =====================================================================
+
+Il frontend di Orion è un'applicazione React~19 con TypeScript, derivata dal frontend di Vera e
+adattata per la nuova architettura. Le differenze significative riguardano tre aspetti:
+il rendering del badge di routing, la gestione delle \emph{response shape} eterogenee e il supporto alle citazioni di CooPolicy.
+
+\subsection{Badge di routing e trasparenza}
+\label{subsec:orion-impl-fe-routing}
+
+Ogni messaggio di risposta include un \emph{badge} visibile sopra il testo che
+indica quale agente ha servito la richiesta e con quale livello di complessità:
+ad esempio, ``SysAid $\cdot$ Alta'' o ``CooPolicy $\cdot$ Bassa''.
+Il badge è un componente React che riceve i campi \texttt{agent\_used} e \texttt{complexity}
+dall'oggetto \texttt{OrionProxyResponse}. La scelta di rendere visibile il routing è motivata da due ragioni: il valore dimostrativo nel contesto della tesi,
+e la fiducia dell'utente nel sistema (l'utente vede che la risposta proviene da un agente specializzato).
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.7\textwidth,height=0.9\textheight,keepaspectratio]{routing1}
+  \caption[Orion: cambio agente nella stessa conversazione]{Routing trasparente con cambio di agente all'interno di un'unica conversazione: la prima richiesta (NPS) è instradata ad AllyCare (badge \emph{ORION $\cdot$ AllyCare $\cdot$ Bassa}), la successiva (ticket IT) a SysAid (badge \emph{ORION $\cdot$ SysAid $\cdot$ Alta}), senza che l'utente debba cambiare strumento.}
+  \label{fig:orion_switch}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.95\textwidth,keepaspectratio]{approfondimenti-routing}
+  \caption[Orion: meccanismo di clarification]{Il meccanismo di \emph{clarification}: quando la confidence del router è sotto la soglia, Orion non instrada ma pone all'utente una domanda di disambiguazione (``Su cosa vorresti fare l'analisi?'', ``A quale aspetto di Bologna ti riferisci?'') prima di procedere.}
+  \label{fig:orion_clarification}
+\end{figure}
+
+\subsection{Renderer adattivo per risposte eterogenee}
+\label{subsec:orion-impl-fe-shapes}
+
+Il frontend implementa un renderer che si adatta
+alla \emph{shape} della risposta in base al campo \texttt{agent\_used}:
+
+\begin{itemize}
+  \item \textbf{SysAid / AllyCare:} la risposta può includere grafici (\texttt{charts}:
+  array di immagini base64), tabelle dati (\texttt{data}: JSON) e
+  query SQL (\texttt{queries}: array di stringhe). I grafici vengono renderizzati in coda alla risposta,
+  i dati in una tabella espandibile con download CSV, le query in un blocco codice collassabile.
+  \item \textbf{CooPolicy:} la risposta include citazioni (\texttt{sources}: array con titolo, snippet, URI normalizzata).
+  Le citazioni sono rese come link cliccabili che aprono il PDF originale attraverso il proxy \texttt{/api/orion/docs/file}.
+  Le tabelle Markdown eventualmente presenti nella risposta sono renderizzate con \texttt{remark-gfm}.
+  \item \textbf{Self (Orion):} la risposta segue il formato di Vera, con citazioni web inline e supporto a documenti caricati.
+\end{itemize}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.65\textwidth,height=0.9\textheight,keepaspectratio]{routing3}
+  \caption[Orion: instradamento a CooPolicy con citazioni]{Una richiesta su una policy aziendale instradata a CooPolicy attraverso Orion: la risposta conserva le citazioni numerate \texttt{[N]} ai documenti sorgente, normalizzate dal proxy e rese cliccabili dal frontend.}
+  \label{fig:orion_coopolicy}
+\end{figure}
+
+% =====================================================================
+\section{Admin Panel di Orion}
+\label{sec:orion-impl-admin}
+% =====================================================================
+
+Il pannello di amministrazione di Orion è composto da un frontend React
+(\texttt{orion-admin-frontend}) e da un backend FastAPI dedicato
+(\texttt{orion-admin-backend}), accessibili dal portale amministrativo.
+In continuità architetturale con Vera, che dispone della coppia
+\texttt{vera-admin-backend} / \texttt{vera-admin-frontend},
+il backend admin di Orion è un servizio Cloud Run separato dal backend
+principale, derivato dalla stessa base di \texttt{vera-admin-backend} e
+operante sulle tabelle \texttt{orion\_*} del database condiviso.
+I suoi endpoint sono serviti sotto il prefisso \texttt{/api/orion-admin/}.
+
+Il pannello condivide con quello di Vera (Sez.~\ref{sec:agenti-admin-impl})
+le pagine di gestione standard --- budget token, statistiche di consumo,
+log conversazioni, feedback strutturato, esenzioni PII, impostazioni Model
+Armor --- e aggiunge le sezioni specifiche per l'orchestratore:
+
+\begin{description}
+  \item[Routing Logs.] Tabella paginata delle decisioni di routing, con timestamp, username, estratto del prompt,
+  agente selezionato, complessità, confidence (con codifica cromatica: verde $\geq 0{,}80$, giallo $\geq 0{,}60$, rosso $< 0{,}60$), flag di clarification. Il click su una riga espande il \emph{reasoning} completo del router, consentendo all'amministratore di diagnosticare le classificazioni errate.
+
+  \item[Router Prompt.] Editor del \emph{system prompt} del router con textarea a tutta larghezza,
+  indicazione della data dell'ultimo aggiornamento e bottone ``Salva e Attiva''.
+  Il prompt è persistito nella tabella \texttt{app\_settings} del database, non nel codice:
+  questo consente di iterare il prompt senza un nuovo rilascio del backend.
+
+  \item[Metriche di Routing.] Dashboard con quattro KPI (richieste totali, confidence media, clarification rate, numero di agenti attivi)
+  e un grafico a barre della distribuzione delle richieste per agente.
+
+  \item[Eval Routing.] Pagina di valutazione automatica del routing: consente
+  di gestire la test suite, lanciare run di valutazione e confrontare lo
+  storico delle run direttamente dal browser. È lo strumento con cui è stata
+  condotta la valutazione sperimentale di questa tesi, ed è descritta in
+  dettaglio nel Capitolo~\ref{chap:orion-valutazione}
+  (Sez.~\ref{subsec:eval-admin-page}).
+\end{description}
+
+% =====================================================================
+\section{Infrastruttura e persistenza}
+\label{sec:orion-impl-iac}
+% =====================================================================
+\label{sec:orion-impl-db}
+
+L'infrastruttura di Orion aggiunge i quattro servizi Cloud Run citati al deployment Terraform esistente.
+Ciascun servizio ha il proprio trigger Cloud Build collegato al rispettivo repository Bitbucket.
+Le variabili d'ambiente specifiche di Orion (URL dei sub-agenti, soglia di confidence, modello del router)
+sono iniettate da Terraform attraverso il file \texttt{tfvars} dell'ambiente corrispondente, seguendo lo stesso pattern
+degli altri servizi della suite (Sez.~\ref{subsec:agenti-iac}).
+
+Il database di Orion è ospitato sulla stessa istanza Cloud SQL della suite (database \texttt{ai\_agents\_db}),
+con tabelle distinte identificate dal prefisso \texttt{orion\_}. Le tabelle principali sono:
+
+\begin{itemize}
+  \item \texttt{orion\_users}, \texttt{orion\_conversations}, \texttt{orion\_messages}: ereditate dalla struttura di Vera, gestiscono utenti, conversazioni e messaggi.
+  \item \texttt{orion\_routing\_logs}: registra ogni decisione del router con username, estratto del prompt, agente selezionato, complessità, confidence, flag di clarification e reasoning completo.
+  \item \texttt{orion\_eval\_test\_cases}: contiene i test case della suite di valutazione (ID, prompt, agente atteso, complessità attesa, categoria, note).
+  \item \texttt{orion\_eval\_results}: contiene i risultati di ogni run di valutazione (run ID, versione del prompt, agente atteso vs prodotto, complessità attesa vs prodotta, confidence, reasoning, flag di correttezza).
+\end{itemize}
+
+Come per il resto della suite (Cap.~\ref{chap:agenti}), non si utilizzano
+framework di migrazione: tutte le tabelle sono create automaticamente e in
+modo idempotente al primo avvio di ciascun servizio tramite
+\texttt{Base.metadata.create\_all()} (il primo servizio che parte crea lo
+schema, il secondo lo trova già presente), e le eventuali evoluzioni dello
+schema sono gestite con istruzioni \texttt{ALTER TABLE ... ADD COLUMN IF NOT
+EXISTS} nel codice di inizializzazione.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[height=0.9\textheight,keepaspectratio]{orion-er}
+    \caption[Schema del database Orion]{Schema relazionale del database di Orion: utenti, conversazioni, messaggi, log di routing e tabelle di valutazione (colonne tratte dai modelli SQLAlchemy del backend).}
+    \label{fig:orion_er}
+\end{figure}
+
+% =====================================================================
+\section{Decisioni architetturali e loro motivazione}
+\label{sec:orion-decisioni}
+% =====================================================================
+
+Questa sezione riassume le principali decisioni architetturali di Orion,
+documentando per ciascuna le alternative considerate e le ragioni della scelta effettuata.
+
+\begin{table}[htbp]
+  \centering
+  \caption[Decisioni architetturali di Orion]{Principali decisioni architetturali di Orion con alternative considerate e motivazione della scelta.}
+  \label{tab:orion-decisioni}
+  \begin{tabular}{p{3.5cm}p{3.5cm}p{6cm}}
+    \toprule
+    \textbf{Decisione}       & \textbf{Alternativa}        & \textbf{Motivazione}                   \\
+    \midrule
+    Modello routing: Gemini Flash
+                             & Gemini Pro, Claude, router appreso~\cite{ong2024routellm}
+                             & Latenza sub-secondo, costo trascurabile, capacità sufficiente per classificazione a $K$ etichette \\
+    Soglia confidence: 0,60  & 0,50, 0,70, adattiva
+                             & Compromesso tra clarification rate e accuracy, calibrato empiricamente (Cap.~\ref{chap:orion-valutazione}) \\
+    Storia: unica in Orion   & Separata per agente
+                             & Continuità dell'esperienza utente; i sub-agenti ricevono storia troncata \\
+    Routing trasparente      & Nascosto
+                             & Badge visibile sopra la risposta con agente e complessità; valore dimostrativo e fiducia utente \\
+    \bottomrule
+  \end{tabular}
+\end{table}

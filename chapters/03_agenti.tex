@@ -1,0 +1,1121 @@
+% !TEX root = ../main.tex
+% =====================================================================
+% CAPITOLO 3 — LA SUITE DI AGENTI VERTICALI
+% (fusione dei precedenti capitoli "architettura" e "implementazione",
+%  revisione giugno 2026 su indicazione dei relatori — vedi
+%  plans/PIANO_REVISIONE_FEEDBACK.md, attività F1)
+% =====================================================================
+
+\chapter{La suite di agenti verticali}
+\label{chap:agenti}
+
+Questo capitolo descrive la prima fase del progetto: la progettazione e la
+realizzazione della suite di agenti verticali. Il percorso segue l'ordine
+delle decisioni effettivamente prese: dapprima i principi guida che hanno
+condizionato ogni scelta successiva e l'architettura d'insieme che ne
+discende; quindi le fondazioni trasversali comuni a tutti i servizi (stack
+tecnologico, organizzazione del codice, infrastruttura come codice, identità
+e sicurezza); infine ciascuno dei quattro agenti, presentato una sola volta
+dal caso d'uso fino ai dettagli realizzativi. Chiudono il capitolo il
+pannello di amministrazione e le alternative progettuali considerate e
+scartate. L'orchestratore Orion, che completa l'ecosistema instradando
+automaticamente le richieste verso gli agenti qui descritti, è oggetto del
+Capitolo~\ref{chap:orion}.
+
+% =====================================================================
+\section{Principi guida}
+\label{sec:agenti-principi}
+% =====================================================================
+\label{subsec:agenti-principi-guida}
+
+La progettazione è stata guidata da una serie di principi fondamentali trasversali,
+stabiliti prima di avviare lo sviluppo e mantenuti durante tutte le fasi successive.
+
+\begin{description}
+
+  \item[Rispetto dei principi etici e cooperativi]
+    Gli agenti LLM sono intrinsecamente portati a esprimere bias: è un limite strutturale dei modelli generativi (Sez.~\ref{sec:bg-llm}).
+    Per Coop Alleanza è importante mitigare i possibili effetti negativi sugli utenti, caratterizzando inoltre il comportamento
+    degli agenti nel pieno rispetto dei principi etici che sono alla base della Cooperativa.
+    Mettendo a disposizione degli utenti un pacchetto di assistenti per le loro necessità, si può cercare di
+    prevenire l'utilizzo da parte loro di strumenti AI esterni pubblici e/o non autorizzati (fenomeno chiamato ``Shadow AI'').
+    Oltre alla riduzione degli evidenti rischi per la sicurezza del dato, gli strumenti a sviluppo interno possono essere ``istruiti''
+    secondo dei ``prompt di sistema'' stabiliti collegialmente fra i vari uffici interni, facendo sì
+    che le risposte prodotte siano conformi ai valori cooperativi ed etici, o comunque ai valori dell'organizzazione.
+    A tal fine, tutti i prompt di sistema dei vari agenti devono integrare direttive esplicite, volte a
+    garantire che ogni agente rifletta l'identità e i valori dell'organizzazione,
+    in conformità con i requisiti di trasparenza e \emph{human oversight} previsti dal
+    Regolamento Europeo sull'Intelligenza Artificiale~\cite{eu2024aiact},
+    mantenendo inoltre la possibilità di modifiche in corso d'opera e cicli di aggiornamento rapidi e controllati.
+
+  \item[Governance facilitata e efficace]
+    Gli agenti devono implementare soluzioni adeguate a prevenire utilizzi impropri e fughe di dati personali.
+    Le configurazioni relative al prompt di sistema (la ``personalità'' dell'agente) e del grado di controllo su utilizzi impropri e
+    dati personali devono essere visualizzabili e impostabili da una dashboard apposita,
+    che consenta agli uffici preposti (che non hanno competenza tecnica stretta) di controllare intuitivamente questi parametri.
+    Inoltre deve essere possibile, nel rispetto della privacy, monitorare i casi di eventi segnalati come ``pericolosi''.
+    Tutto il codice sorgente deve essere presente e aggiornato nel repository Git usato dall'organizzazione, e considerato
+    proprietà della Cooperativa.
+
+  \item[Implementazione agnostica e sostenibile]
+    Nella realtà aziendale attuale, molti fornitori propongono i propri modelli di assistenti o agenti AI.
+    Spesso questo comporta il rischio di una dipendenza (vendor lock-in) più o meno rilevante: ad esempio, le soluzioni ``out of the box''
+    risultano di difficile trasposizione verso realtà infrastrutturali diverse da quelle del fornitore.
+    Inoltre spesso sono richiesti piani di abbonamento o sottoscrizioni che possono comportare costi fissi elevati
+    anche in caso di effettivo inutilizzo dello strumento.
+    La soluzione realizzata deve essere completamente portabile e facilmente adattabile
+    verso qualunque architettura; inoltre deve consentire un controllo attivo, adattivo e dinamico dei costi, stanziando
+    periodicamente un budget di utilizzo definito dagli amministratori (``token'') per ogni utente, granularmente modificabile in
+    caso di necessità, così da garantire la sostenibilità del progetto.
+    Ovunque possibile deve essere implementato un ``routing'' che indirizzi verso modelli più semplici ed economici le richieste a bassa complessità.
+
+  \item[Sovranità del dato]
+    Nessun dato deve lasciare il perimetro cloud europeo, in conformità al Regolamento Generale sulla Protezione dei Dati (GDPR).
+
+  \item[Modularità verticale]
+    Ogni dominio informativo o funzionale deve essere affidato a un agente autonomo e indipendente,
+    con il proprio meccanismo di grounding, il proprio ciclo di vita applicativo e la propria infrastruttura di deployment:
+    in modo che sia possibile effettuare \emph{prompt engineering} e \emph{few-shot learning}~\cite{brown2020gpt3}
+    ad hoc per il singolo caso d'uso.
+    I sistemi devono essere il più possibile isolati per consentire di aggiornare, monitorare e
+    scalare ogni servizio in modo indipendente.
+
+  \item[Automazione dei rilasci]
+    Le evolutive devono potere essere rilasciate in maniera trasparente verso l'utente senza causare disservizio,
+    in maniera automatizzata per ridurre al minimo la possibilità di errore umano,
+    e con uno step approvativo per il passaggio in produzione.
+
+  \item[Accesso privato e con controllo centralizzato]
+    L'intero ecosistema deve potere essere accessibile solo da rete interna o VPN di Coop Alleanza:
+    l'infrastruttura utilizzata deve quindi evitare l'esposizione su rete pubblica.
+    Il controllo dell'abilitazione degli utenti all'uso degli assistenti deve integrarsi con il sistema di Identity Management
+    già esistente nell'organizzazione, basato sui protocolli OAuth~2.0~\cite{rfc6749oauth2} e OpenID Connect~\cite{oidc1_0core}
+    su Microsoft Entra ID~\cite{msft_entra_id}.
+
+\end{description}
+
+% =====================================================================
+\section{Architettura d'insieme}
+\label{subsec:agenti-architettura-insieme}
+% =====================================================================
+
+L'ecosistema di agenti deve essere accessibile da un unico ``portale'', così che l'utente possa abituarsi all'utilizzo
+di un unico punto di accesso: è la logica conseguenza della modularità verticale descritta in precedenza.
+I nuovi agenti potranno semplicemente essere inseriti nel ``framework'' esistente.
+Lo stesso approccio vale per le dashboard di configurazione (``admin panel'') quando necessarie,
+anch'esse radunate in un portale dedicato.
+
+Pur mantenendo come centrale e rilevante il principio della maggiore agnosticità, portabilità e indipendenza possibili,
+tutte le implementazioni saranno realizzate con le risorse disponibili sulla piattaforma Cloud di Google~\cite{gcp_vertexai,gcp_cloudrun}:
+si tratta al momento dell'unico fornitore di sistemi cloud attivo in Coop Alleanza (come approfondito anche di seguito, le risorse del data center
+on-premises, pur esistenti, non consentono una realizzazione abbordabile e performante di progetti di AI generativa).
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.9\textwidth]{fig1}
+  \caption[Architettura d'insieme della suite di agenti]{Architettura
+    della suite di agenti verticali: portal con autenticazione federata,
+    quattro servizi di calcolo serverless indipendenti e infrastruttura
+    condivisa per database, data warehouse e servizi AI.}
+  \label{fig:architettura_suite}
+\end{figure}
+
+% =====================================================================
+\section{Fondazioni trasversali: stack, infrastruttura, sicurezza}
+\label{sec:agenti-stack}
+% =====================================================================
+
+Prima di esaminare i singoli agenti, questa sezione descrive gli elementi
+trasversali del progetto, condivisi da tutti i servizi della suite e
+presentati qui una sola volta: lo stack tecnologico, l'organizzazione del
+codice, l'infrastruttura come codice con la pipeline di rilascio, e il
+modello di identità e autorizzazione.
+
+\subsection{Stack tecnologico}
+\label{subsec:agenti-stack-tech}
+
+L'implementazione dell'ecosistema di agenti è basata su uno stack cloud-native
+il più possibile omogeneo, scelto per minimizzare la diversità fra servizi (riducendo la complessità
+per quanto possibile) e per delegare ai \emph{managed services} di Google Cloud Platform tutti i compiti
+infrastrutturali.
+
+\begin{itemize}
+  \item \textbf{Backend.} Tutti gli agenti sono scritti in Python~3.10+ ed
+        esposti tramite il framework asincrono FastAPI~\cite{fastapi_docs}. La scelta è motivata
+        dalla natura prevalentemente \emph{I/O bound} delle interazioni con i
+        Large Language Model: la generazione di una risposta richiede da
+        centinaia di millisecondi a decine di secondi, quasi interamente spesi
+        in attesa del modello, dei motori di retrieval o di BigQuery. Il modello
+        di concorrenza \texttt{async/await} consente di sostenere centinaia di
+        richieste concorrenti per istanza Cloud Run senza ricorrere a
+        thread o processi multipli. L'accesso al database relazionale avviene
+        in modo asincrono tramite SQLAlchemy~2 e il driver
+        \texttt{asyncpg}, con \emph{pool} pre-pingati e ricicli automatici.
+  \item \textbf{Frontend.} Le interfacce sono React~19 con TypeScript,
+        impacchettate con Vite e stilizzate con Tailwind~CSS. La scelta
+        di un \emph{bundler} ESM moderno è funzionale alla pipeline CI/CD:
+        il build è di pochi secondi, riducendo i tempi di rilascio.
+  \item \textbf{Database e Data Warehouse.} Cloud SQL per
+        PostgreSQL~15~\cite{gcp_cloudsql} è il \emph{system of record}
+        applicativo: vi risiedono utenti, conversazioni, messaggi, quote,
+        ACL, audit log e parametri di configurazione. Google
+        BigQuery~\cite{gcp_bigquery} è invece il database analitico
+        utilizzato dagli agenti Text-to-SQL (AllyCare e SysAid), con
+        dataset alimentati in modo continuo da flussi appositi.
+  \item \textbf{Large Language Models.} L'implementazione poggia su due
+        famiglie di modelli erogati come \emph{managed APIs}: Gemini~2.5
+        Flash e Pro~\cite{team2024gemini} su Vertex AI~\cite{gcp_vertexai},
+        e Claude Sonnet~4.6~\cite{anthropic2024claude}
+        attraverso l'SDK Anthropic veicolato dal canale
+        \texttt{AnthropicVertex}~\cite{anthropic_docs}. La coesistenza
+        dei due fornitori in SysAid (Sez.~\ref{sec:agenti-sysaid-arch})
+        concretizza un caso di agnosticità come richiesto dai principi
+        guida (Sez.~\ref{sec:agenti-principi}).
+  \item \textbf{Sviluppo di agenti.} Viene utilizzato il \emph{Google Agent
+        Development Kit}~(ADK)~\cite{google_adk_docs}, una libreria aperta,
+        ufficiale e portabile che astrae la gestione della sessione, l'invocazione
+        ciclica del modello e l'integrazione di \emph{tool} basati su
+        \emph{function calling}.
+ \item \textbf{Infrastruttura.} Ogni componente applicativo è un servizio
+        serverless eseguito su Google Cloud Run~\cite{gcp_cloudrun},
+        descritto interamente da codice Terraform~\cite{terraform_docs}.
+\end{itemize}
+
+\subsection{Organizzazione del codice}
+\label{subsec:agenti-multirepo}
+
+Il codice sorgente dell'intera suite è organizzato in repository Git distinti,
+ciascuno autonomo e con il proprio ciclo di vita. Ogni repository
+contiene il proprio \texttt{Dockerfile}, le proprie dipendenze e il proprio
+file di descrizione della pipeline (\texttt{cloudbuild.yaml}),
+ed è collegato a un trigger Cloud Build dedicato. Questa separazione consente
+rilasci indipendenti: un aggiornamento a CooPolicy non richiede il rebuild
+di Vera, e un hotfix su SysAid può essere rilasciato senza coordinamento
+con il frontend del portale. I branch \texttt{test} e \texttt{main} di ogni
+repository corrispondono rispettivamente all'ambiente di collaudo e a quello
+di produzione; il branch develop può invece essere sfruttato per i test in locale.
+
+\begin{figure}[h]
+  \centering
+  \begin{lstlisting}[language=bash]
+vera-backend/              # Vera Backend (FastAPI + ADK + Gemini)
+vera-frontend/             # Vera Frontend (React)
+vera-admin-backend/        # Pannello amministrativo di Vera Backend
+vera-admin-frontend/       # Pannello amministrativo di Vera Frontend
+sysaid-backend/            # SysAid Backend unificato (Gemini + Sonnet)
+sysaid-frontend/           # SysAid Frontend
+coopolicy-backend/         # CooPolicy Backend (FastAPI + RAG)
+coopolicy-frontend/        # CooPolicy Frontend
+allycare-backend/          # AllyCare Backend (FastAPI + ADK + BigQuery)
+allycare-frontend/         # AllyCare Frontend
+portal-frontend/           # Portale utenti (MSAL)
+admin-portal-frontend/     # Portale amministrativo
+infrastructure/            # Terraform per infrastruttura
+  \end{lstlisting}
+  \caption[Elenco dei repository della suite (agenti)]{Elenco dei repository della suite nella ``fase'' degli agenti verticali. Ogni servizio è un progetto Git autonomo con proprio ciclo di CI/CD e branch per ambiente (\texttt{test}, \texttt{main}). I repository dell'orchestratore sono inseriti dal Capitolo~\ref{chap:orion}.}
+  \label{fig:multirepo_tree}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.9\textwidth]{progetto-bitbucket}
+  \caption[Progetto Bitbucket della suite]{Il progetto Bitbucket che raccoglie i repository della suite: ogni servizio è un repository autonomo con il proprio ciclo di CI/CD.}
+  \label{fig:progetto_bitbucket}
+\end{figure}
+
+I backend più complessi (Vera e Vera-Admin) adottano una separazione interna del codice
+più strutturata: la directory \texttt{api/} contiene esclusivamente i router
+FastAPI; \texttt{services/} le funzioni di dominio prive di stato HTTP;
+\texttt{models/} le entit\`a SQLAlchemy; \texttt{schemas/} i modelli Pydantic
+per validazione di input e output; \texttt{core/} le utility trasversali
+(database, dipendenze, sicurezza). I backend più piccoli (CooPolicy, AllyCare e
+SysAid) condividono la stessa filosofia in forma compressa, con
+un singolo \texttt{main.py} che monta i \emph{router} e alcuni moduli
+ausiliari (\texttt{auth.py}, \texttt{tools.py}, \texttt{agent.py}, \texttt{quote.py}).
+
+\subsection{Infrastruttura come codice e pipeline CI/CD}
+\label{subsec:agenti-iac}
+
+L'intera infrastruttura GCP è descritta in Terraform~\cite{terraform_docs} ed è
+parametrizzata su due ambienti, \texttt{test} e \texttt{prod}, gestiti come
+progetti indipendenti con \emph{state} remoto su un bucket Cloud
+Storage. Le risorse provisionate comprendono: l'abilitazione delle API GCP
+necessarie, le istanze Cloud Run con un service account condiviso, l'istanza
+Cloud SQL con il relativo \emph{Private Service Connect} consumer endpoint, le
+politiche di Identity and Access Management (IAM), il bucket di Artifact
+Registry per le immagini Docker, il template Model Armor, la rete (subnet,
+indirizzi IP riservati, regole di forwarding) e il bilanciatore di carico HTTPS
+interno con il certificato TLS recuperato da Secret Manager (Certificato fornito dall'IT di Coop Alleanza).
+
+Le decisioni di sicurezza fondamentali sono codificate direttamente nel
+modulo Terraform e dunque non sono modificabili senza una \emph{pull request}
+revisionata:
+
+\begin{enumerate}
+  \item \textbf{Egress limitato a indirizzi privati.} Ogni servizio Cloud Run
+        è collegato alla VPC interna mediante \emph{Direct VPC Egress} con
+        \texttt{egress = PRIVATE\_RANGES\_ONLY}: il container può raggiungere
+        gli endpoint privati GCP (Vertex AI, BigQuery, Cloud SQL, RAG Engine)
+        ma non internet pubblico. Il vincolo è particolarmente importante per
+        gli agenti Text-to-SQL e per Vera, dove un'eventuale estrazione di dati verso
+        l'esterno via DNS o webhook è di fatto resa impossibile a livello di
+        rete.
+  \item \textbf{Database non esposto su IP pubblico.} L'istanza Cloud SQL ha
+        \texttt{ipv4\_enabled = false}: la connessione passa solo attraverso
+        \emph{Private Service Connect} (PSC), con un \emph{forwarding rule}
+        regionale verso il \emph{service attachment} di Cloud SQL:
+        è, in sostanza, anch'esso esposto in sola rete privata.
+  \item \textbf{Bilanciatore di carico interno.} Il \emph{frontend} è
+        accessibile solo via un \emph{Application Load Balancer regionale
+        interno} (\texttt{INTERNAL\_MANAGED}). L'esposizione
+        avviene perciò solo all'interno della rete aziendale o, per gli
+        utenti remoti, dietro VPN, soddisfacendo il requisito di
+        accesso privato (Sez.~\ref{sec:agenti-principi}).
+  \item \textbf{Segregazione di credenziali.} Tutte le password generate
+        (database, JWT) sono prodotte da \texttt{random\_password},
+        depositate in Secret Manager e iniettate nei container via
+        \texttt{value\_source.secret\_key\_ref}: nessun segreto
+        attraversa mai il file system dello sviluppatore.
+\end{enumerate}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.9\textwidth]{arch-terraform}
+  \caption[Architettura GCP descritta in Terraform]{Architettura completa dell'infrastruttura GCP della suite, così come descritta nei moduli Terraform: Cloud Run, Cloud SQL, Load Balancer interno, Secret Manager, Vertex AI.}
+  \label{fig:arch_terraform}
+\end{figure}
+
+La pipeline CI/CD si attiva ad ogni \emph{push}: in ambiente di test sul branch
+\texttt{test}, in produzione sul branch \texttt{main}. Cloud Build, configurato
+tramite un \emph{trigger} per ciascun servizio collegato al rispettivo
+repository Bitbucket, esegue i passi descritti nel \texttt{cloudbuild.yaml}
+locale: build dell'immagine Docker, push su Artifact Registry e aggiornamento
+dell'immagine attiva del relativo servizio Cloud Run. Per l'ambiente di
+produzione, il \emph{trigger} ha \texttt{approval\_required = true}, che
+implementa lo step approvativo richiesto dal principio di
+\emph{Automazione dei rilasci} (Sez.~\ref{sec:agenti-principi}).
+Tale rilascio potrà essere poi ``sbloccato'' solo dagli amministratori di sistema della Cooperativa.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[height=0.75\textheight,keepaspectratio]{gitflow}
+  \caption[Branching strategy e pipeline CI/CD]{La branching strategy adottata: ogni push sul branch \texttt{test} avvia un deploy automatico sull'ambiente di collaudo; il passaggio in produzione avviene tramite merge su \texttt{main} e richiede l'approvazione esplicita di un revisore prima del deploy su Cloud Run.}
+  \label{fig:cicd_pipeline}
+\end{figure}
+
+\subsection{Identità, autenticazione e autorizzazione}
+\label{subsec:agenti-auth}
+
+L'autenticazione è interamente delegata a Microsoft Entra ID, che è l'unico
+\emph{tenant} di identità usato in Cooperativa.
+La scelta del flusso e della libreria segue lo standard di mercato per le \emph{single-page
+applications}: il browser ottiene un \emph{access token} via
+OAuth~2.0~\cite{rfc6749oauth2} e OpenID Connect~\cite{oidc1_0core} con
+\emph{Authorization Code Flow + PKCE}, gestito dalla
+\emph{Microsoft Authentication Library} (MSAL)~\cite{msft_msal} caricata nel
+portale e nel pannello di amministrazione. Il token è un JWT firmato in
+RS256~\cite{rfc7519jwt} ed è il vettore di autorizzazione che attraversa la
+suite.
+
+Sul lato server, la verifica del token Entra ID è affidata alla funzione
+\texttt{verify\_entra\_token} all'atto del login federato ed esegue le verifiche
+minime ma non negoziabili: scarica e mette in cache
+le chiavi pubbliche da \texttt{JWKS} esposto da Microsoft, identifica la
+chiave corretta tramite il campo \texttt{kid} dell'header, decodifica il
+token con la libreria \texttt{python-jose} validandone audience e
+firma e, infine, valida manualmente l'\texttt{issuer} contro la coppia
+\texttt{(sts.windows.net, login.microsoftonline.com)}: questa
+ridondanza è necessaria perché Entra ID emette token con \texttt{iss}
+v1 o v2 a seconda dell'\emph{endpoint} usato, e l'opzione \texttt{verify\_iss}
+del decoder accetta un solo valore alla volta. Una rotazione di chiavi non
+prevista forza un secondo \emph{fetch} del JWKS prima di restituire un
+errore 401: la cache non è quindi un \emph{single point of failure}.
+Superata la verifica, il backend emette un JWT di sessione applicativo, firmato
+con un segreto interno, che le richieste successive presentano alla dipendenza
+FastAPI montata su ogni endpoint protetto. Accanto al login federato, un meccanismo
+di autenticazione locale con credenziali dedicate resta riservato all'utenza
+amministrativa di servizio (inizializzazione e accesso di emergenza).
+
+L'autorizzazione si basa su un modello semplificato: un unico gruppo
+Active Directory (``AI Users'') controlla l'accesso all'intera piattaforma.
+Il claim JWT \texttt{group AI Users} contiene il GUID del gruppo;
+il portale verifica la presenza dell'utente nel gruppo e, in caso positivo,
+rende visibili gli agenti. I backend replicano la stessa verifica
+sui propri endpoint. I claim
+\texttt{preferred\_username}, \texttt{Ruolo} e \texttt{Direzione},
+propagati dai sistemi HR a Entra ID, sono utilizzati per personalizzare
+le risposte degli agenti (es. tono, contesto organizzativo) ma non per
+controllare l'accesso.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.75\textwidth,height=0.4\textheight,keepaspectratio]{login1}
+  \caption[Portale agenti: pulsante di accesso]{Il portale agenti prima dell'autenticazione: il pulsante avvia il flusso OAuth~2.0 + PKCE delegato a Microsoft Entra ID tramite MSAL.}
+  \label{fig:login1}
+  \vspace{1em}
+  \includegraphics[width=0.75\textwidth,height=0.4\textheight,keepaspectratio]{login2}
+  \caption[Schermata di autenticazione Microsoft personalizzata]{La schermata di autenticazione Microsoft Entra ID personalizzata con il brand dell'organizzazione:
+  l'utente accede con le credenziali aziendali esistenti e controllo MFA, senza registrazione aggiuntiva.}
+  \label{fig:login2}
+\end{figure}
+
+Il consumo di token è controllato da un servizio di quota che opera su
+una \emph{tabella condivisa} (\texttt{token\_budget}) nel database: ogni
+utente dispone di un unico budget mensile, indipendente dall'agente
+utilizzato. Prima di ogni chiamata al modello, il backend verifica che il
+budget residuo sia sufficiente; al termine contabilizza i token effettivi.
+Il budget è associato all'utente (\emph{Bronze}, \emph{Silver},
+\emph{Gold}) e modificabile dall'amministratore in caso di necessità
+eccezionali. Questo meccanismo,
+trasversale a tutti gli agenti, realizza il principio di
+\emph{Implementazione agnostica e sostenibile} enunciato fra i principi
+guida (Sez.~\ref{sec:agenti-principi}).
+
+Il prompt di sistema, in ogni agente escluso CooPolicy (in cui l'ottimizzazione e l'ispezione avvengono a
+livello di ottimizzazione di ricerca RAG, più ``a monte'' rispetto al ragionamento LLM), impone una disciplina di output esplicita:
+ogni risposta deve aprirsi con una sezione \texttt{\#\#\# RAGIONAMENTO} che
+enuncia obiettivo, scelte, strategie e note appropriate;
+deve quindi chiamare il (o i) \emph{tool} appropriato; deve infine produrre la sezione
+\texttt{\#\#\# RISPOSTA} solo dopo aver ricevuto i risultati. La
+disciplina è una forma di Chain-of-Thought esplicito~\cite{wei2022cot},
+estesa con un protocollo a due tag che separano in modo riconoscibile la
+fase di pianificazione dall'output utente. Una funzione
+\texttt{\_clean\_answer} ``collassa'' il blocco di ragionamento da quanto
+viene effettivamente mostrato all'utente, in modo che la
+trasparenza sia disponibile per fare auditing ma l'esperienza utente sia pulita.
+
+I passaggi citati sono sempre racchiusi in un \texttt{try/except} che riconosce gli
+errori transitori della piattaforma di inferenza
+(\texttt{RESOURCE\_EXHAUSTED}, \texttt{429}, \texttt{503}, \emph{rate
+limit}) e li ripete con \emph{backoff} lineare fino a tre
+tentativi, evitando che picchi di traffico contro Vertex AI degradino
+la qualità di servizio percepita dall'utente. La medesima strategia di
+retry transitorio è utilizzata anche da CooPolicy nelle chiamate al RAG
+Engine, e da AllyCare e SysAid nelle chiamate SQL BigQuery.
+
+% =====================================================================
+\section{Il portale utente}
+\label{sec:agenti-portal-impl}
+% =====================================================================
+
+Una volta autenticato, l'utente accede al portale, che funge da punto di ingresso
+unico per tutti gli agenti, in coerenza con il principio
+di modularità verticale e accesso centralizzato
+(Sez.~\ref{sec:agenti-principi}).
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.9\textwidth,height=0.5\textheight,keepaspectratio]{portale}
+  \caption[Menu di scelta degli agenti nel portale]{Il portale utente dopo il login: ogni agente è raggiungibile con un click senza ulteriori autenticazioni.}
+  \label{fig:portal_menu}
+\end{figure}
+\FloatBarrier
+
+% =====================================================================
+\section{Vera --- assistente generale con Web grounding}
+\label{sec:agenti-vera-arch}
+% =====================================================================
+\label{sec:agenti-vera-impl}
+
+Vera è l'agente generalista della suite e il più articolato dal punto di
+vista realizzativo: questa sezione ne presenta il caso d'uso e le scelte
+implementative significative, che ruotano attorno a tre problemi:
+\emph{routing} del modello, \emph{Web grounding} con citazioni inline,
+gestione dei documenti caricati dall'utente.
+
+\subsection{Caso d'uso e requisiti}
+\label{subsec:vera-caso-uso}
+
+Vera deve potere coprire i tipici casi d'uso per cui un utente
+potrebbe rivolgersi a un LLM esterno all'organizzazione:
+analisi e riassunto di documenti e testi, formazione e approfondimento, correzione di codice e formule e così via.
+Deve quindi supportare la possibilità per l'utente di caricare documenti tramite tecnologia RAG~\cite{lewis2020rag}
+nel maggior numero possibile di formati e, per le richieste che necessitano di informazioni attuali, deve potere accedere
+a internet attraverso il meccanismo di Web grounding~\cite{gcp_grounding} che ancora la generazione a
+risultati provenienti da Google Search e ne mitiga il rischio di allucinazione su fatti recenti.
+Quando le risposte fornite vengono tratte da documenti caricati o da internet, la fonte deve essere sempre presente e verificabile.
+Ci deve essere certezza che nello svolgere queste ricerche non possa accadere esfiltrazione
+di dati presenti in documenti o prompt caricati dall'utente, che potrebbero essere confidenziali.
+
+\subsection{Routing del modello basato sulla complessità della query}
+\label{subsec:vera-routing}
+
+La selezione del modello è governata dal modulo \texttt{model\_router.py},
+che stima la complessità della richiesta invocando Gemini~2.5 Flash con un
+prompt di classificazione dedicato (\texttt{thinking\_budget = 0} per
+minimizzare la latenza). La risposta è vincolata a una singola parola,
+\texttt{low} o \texttt{high}, e determina se il turno sarà servito da
+Flash (bassa complessità) o da Gemini~2.5 Pro (alta). Lo stesso schema di
+classificazione è adottato da tutti gli agenti della suite (SysAid,
+AllyCare, CooPolicy), garantendo un trade-off costo/qualità uniforme come
+descritto nella Sez.~\ref{sec:bg-routing}.
+
+\subsection{Pattern di esecuzione: documenti vs Web grounding}
+\label{subsec:vera-paths}
+
+Il generatore distingue due percorsi mutuamente esclusivi sulla base della
+presenza di documenti caricati nella conversazione. Quando ci sono \emph{upload}
+in stato \texttt{ready}, viene costruita o riusata una \emph{Gemini Context
+Cache} associata alla conversazione, che evita di ricaricare i medesimi
+documenti a ogni turno; la generazione avviene quindi tramite l'agente ADK
+\texttt{doc\_qa\_agent}, configurato in modo da utilizzare la cache
+(\texttt{generate\_content\_config.cached\_content}).
+In assenza di upload, il generatore percorre il \emph{path} di conversazione
+generale, che monta un \texttt{LlmAgent} ADK con
+l'\texttt{EnterpriseWebSearchTool} integrato: il modello decide
+autonomamente, in base alla domanda, se invocare la \emph{search} o
+rispondere con la sola conoscenza parametrica.
+
+In entrambi i percorsi la frammentazione dell'output è gestita con la modalità
+\texttt{StreamingMode.SSE} di ADK: il \emph{loop} di eventi del Runner emette
+\texttt{Event} parziali, di cui vengono propagate solo le \texttt{parts} con
+campo \texttt{partial = True}, escludendo i blocchi marcati come
+\texttt{thought}. Nel percorso di conversazione generale, quando il modello
+restituisce \texttt{finish\_reason} uguale a \texttt{MAX\_TOKENS}, il backend
+invia automaticamente un turno addizionale ``Continua la risposta dal punto
+esatto in cui si è interrotta'' fino a una soglia di sicurezza
+(\texttt{\_MAX\_CONTINUATIONS = 4}), così da rendere la risposta completa
+anche quando supera il limite di output del modello.
+
+\subsection{Citazioni inline e \emph{grounding metadata}}
+\label{subsec:vera-citations}
+
+Quando il modello invoca la \emph{Web search}, l'evento ADK porta in un campo
+dedicato (\texttt{event.grounding\_metadata}) la lista dei chunk consultati,
+con URL, titolo e \emph{snippet}. La funzione \texttt{extract\_web\_citations}
+trasforma questa struttura in un array di citazioni che il frontend rende
+inline, cliccabili dall'utente. Per i documenti caricati la citazione viene
+estratta da un \texttt{citation\_extractor} che attraversa il testo finale e
+risolve i riferimenti contro la lista dei \texttt{cache\_uploads}. Il fatto
+che la fonte sia sempre verificabile e cliccabile, e che la sua presenza sia
+imposta dal sistema (non opzionale per il modello), realizza il vincolo di
+verificabilità descritto nella Sez.~\ref{subsec:vera-caso-uso}.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.68\textwidth,height=0.85\textheight,keepaspectratio]{vera1}
+  \caption[Conversazione con Vera: Web grounding]{Una conversazione con Vera in modalità Web grounding: le fonti recuperate da Google Search sono citate inline e cliccabili dall'utente.}
+  \label{fig:vera_conv_web}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth,keepaspectratio]{vera2}
+  \caption[Conversazione con Vera: documento caricato]{Una conversazione con Vera dopo il caricamento di un documento: la risposta è ancorata al file tramite Gemini Context Cache e la fonte è indicata.}
+  \label{fig:vera_conv_doc}
+\end{figure}
+
+\subsection{Catena di sicurezza pre e post generazione}
+\label{subsec:agenti-security}
+
+Coerentemente con il principio di governance facilitata, ogni invocazione di
+modello in Vera attraversa una catena di controlli predisposta nel servizio
+\texttt{model\_armor\_service.py}. La catena ha tre stadi:
+
+\begin{enumerate}
+  \item \textbf{Sanitizzazione del prompt.} Prima di inviare il messaggio
+        all'LLM, il testo passa per il template di Google Cloud Model
+        Armor~\cite{gcp_modelarmor}, che combina un classificatore di
+        \emph{Responsible AI} (categorie \emph{hate}, \emph{harassment},
+        \emph{sexually explicit}, \emph{dangerous}) con il rilevatore
+        di \emph{prompt injection}~\cite{perez2022promptinjection} e con
+        la \emph{Sensitive Data Protection} di Google Cloud~\cite{gcp_dlp}
+        per le PII, in conformità con i requisiti dell'European AI
+        Act~\cite{eu2024aiact} sulla gestione del rischio. I tipi PII rilevanti per il contesto italiano (Codice
+        Fiscale, Partita IVA, IBAN) sono configurati come \emph{custom
+        info types}; quando la PII viene rilevata, il backend non
+        sostituisce ciecamente il valore ma rifiuta la richiesta con un
+        messaggio che invita l'utente a riformulare. Il rifiuto è
+        appropriato perché l'autenticità del dato originale è spesso
+        necessaria per l'utilità della risposta, e il \emph{tokenizing}
+        cieco produrrebbe risposte inutilizzabili.
+  \item \textbf{Esenzioni per gruppo.} Alcuni gruppi (ad esempio l'ufficio
+        legale) hanno legittimo bisogno di trattare PII specifiche.
+        Apposite tabelle PostgreSQL \texttt{model\_armor\_group\_exemptions}
+        e \texttt{pii\_group\_exemptions} consentono di escludere
+        per gruppo singoli filtri (ad esempio \texttt{prompt\_injection}
+        o singole categorie) o singoli tipi di PII. Al momento
+        della verifica, il backend interseca la lista di esenzioni
+        attive per l'utente con i \emph{reasons} restituiti da Model
+        Armor: se ogni motivo è coperto da esenzione, la richiesta
+        prosegue.
+  \item \textbf{Sanitizzazione della risposta e audit.} La stessa funzione
+        di sanitizzazione viene applicata all'output del modello prima del
+        salvataggio in conversazione, e ogni interazione è registrata in
+        modo strutturato nella tabella \texttt{chat\_logs} con
+        \emph{action}, modello selezionato, conteggio token in/out e flag
+        di citazioni. Eventi di blocco vengono inoltre registrati su un
+        \emph{security log} dedicato (\texttt{security\_logger.log\_prompt\_blocked},
+        \texttt{log\_response\_blocked}), che alimenta la dashboard di
+        amministrazione descritta in Sez.~\ref{sec:agenti-admin-impl}.
+\end{enumerate}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.85\textwidth,height=0.75\textheight,keepaspectratio]{flusso-prompt-full}
+  \caption[Catena di sicurezza pre e post generazione]{Il flusso completo di una richiesta in Vera: verifica della quota, sanitizzazione del prompt tramite Model Armor
+  (RAI + prompt injection + DLP) con gestione delle esenzioni per gruppo, chiamata al modello, sanitizzazione della risposta e
+  audit su \texttt{chat\_logs}. Gli agenti verticali esclusivamente grounded non implementano questa catena (cfr.\ paragrafo successivo).}
+  \label{fig:security_chain}
+\end{figure}
+\FloatBarrier
+
+\paragraph{Ambito di applicazione.}
+La catena di sicurezza descritta è specifica di Vera. L'orchestratore Orion,
+descritto nel Cap.~\ref{chap:orion}, implementa la stessa
+catena; quando i sub-agenti verticali sono invocati attraverso Orion, il
+prompt è già stato sanitizzato dall'orchestratore prima dell'inoltro.
+Gli altri agenti verticali (SysAid, AllyCare, CooPolicy) non implementano una
+propria catena di sicurezza pre/post generazione: quando operano in modalità
+\emph{standalone} (accesso diretto dal portale), funzionano esclusivamente
+sulla rete interna aziendale con accesso autenticato
+(Sez.~\ref{subsec:agenti-auth}) e si affidano ai guardrail integrati nel
+proprio prompt di sistema (le direttive che riflettono l'identità e i
+valori dell'organizzazione, descritte fra i principi guida della
+Sez.~\ref{sec:agenti-principi}) come misura di protezione a livello
+di prompt.
+
+% =====================================================================
+\section{CooPolicy --- RAG su corpus di policy condiviso}
+\label{sec:agenti-coopolicy-arch}
+% =====================================================================
+\label{sec:agenti-coopolicy-impl}
+
+CooPolicy è la realizzazione ``RAG-native'' della suite: tutto il backend
+ruota attorno alla pipeline di Retrieval-Augmented
+Generation~\cite{lewis2020rag}, con scelte mirate a comprimere il rumore di
+recupero e ad ancorare la generazione esclusivamente al materiale recuperato.
+
+\subsection{Caso d'uso e requisiti}
+\label{subsec:coopolicy-caso-uso}
+
+L'agente è specializzato nella ricerca e nell'interpretazione di documenti normativi interni:
+deve gestire in sostanza tutta la documentazione presente sulla Intranet aziendale,
+che tratta gli argomenti più vari e si è espansa nel corso degli anni, fino a diventare frastagliata
+e spesso di non facile consultazione.
+Le tematiche trattate dai documenti possono comprendere, a titolo di esempio:
+manuali d'uso, procedure, contratti di lavoro, organigrammi, comunicazioni organizzative.
+
+A differenza di Vera, CooPolicy non deve avere accesso a fonti esterne: vincolo essenziale è che le
+risposte agli utenti siano fornite in maniera precisa e approfondita se il materiale è presente nel
+contesto RAG fornito~\cite{lewis2020rag,guu2020realm}, oppure che non siano fornite affatto.
+Anche in questo caso ogni fonte deve essere correttamente citata e accessibile.
+Devono essere messe in atto tutte le tecniche più adeguate per instradare correttamente le
+richieste degli utenti anche se pervenute in formato molto stringato o interpretabile: a tal fine, il sistema
+classifica ogni query per selezionare il corpus tematico più pertinente e applica una soglia di
+rilevanza permissiva che delega al modello generativo la decisione finale sull'utilità dei chunk recuperati.
+
+\subsection{Multi-corpus e classificazione della query}
+\label{subsec:coopolicy-multicorpus}
+
+Una prima scelta architetturalmente significativa è la rinuncia al
+\emph{single corpus}. La documentazione interna è ripartita in dieci corpus
+Vertex AI~\cite{gcp_vertex_rag} tematici (\texttt{policy-hr},
+\texttt{contratti-smartworking}, \texttt{amministrazione-personale},
+\texttt{procedure-aziendali}, \texttt{processi-regolamenti},
+\texttt{governance-identita}, \texttt{sicurezza},
+\texttt{punti-vendita-operativita}, \texttt{materiale-pdv},
+\texttt{comunicazioni-generali}), ciascuno con un proprio descrittore in
+italiano del dominio coperto. La motivazione è duplice: da un lato la
+qualità del retrieval cala rapidamente al crescere della cardinalità dei
+chunk indicizzati nello stesso spazio vettoriale; dall'altro, alcune
+classi di documenti hanno regole di interpretazione
+specifiche (i contratti collettivi vincolano la risposta in modo diverso
+dalle policy aziendali) e mantenerle separate facilita l'evoluzione
+indipendente e rende meno probabili ambiguità e risposte contraddittorie
+o illogiche.
+
+A monte del retrieval, una funzione \texttt{classify\_query} chiede a
+Gemini~2.5 Flash di scegliere il \emph{corpus primario} ed eventualmente
+un \emph{corpus secondario} fra quelli configurati, restituendo
+strettamente un oggetto JSON con due chiavi. La scelta di Gemini Flash è
+motivata dalla coppia di richieste essenziale di questo passo: bassa
+latenza (sub-secondo) e basso costo unitario, condizione necessaria
+perché il classificatore venga invocato a ogni richiesta senza pesare
+sull'economia del sistema. Il prompt include il descrittore di ciascun
+corpus disponibile.
+
+\subsection{Retrieval e soglia di rilevanza}
+\label{subsec:coopolicy-retrieval}
+
+Il retrieval è eseguito in parallelo sui corpus selezionati attraverso
+\texttt{rag.retrieval\_query} di Vertex AI RAG Engine~\cite{gcp_vertex_rag},
+con \texttt{top\_k = 60} sul corpus primario e \texttt{top\_k = 30} sul
+secondario quando presente. La ricerca è vettoriale densa: ogni query
+viene trasformata in un embedding e confrontata per similarità coseno
+con i vettori dei chunk indicizzati.
+
+I chunk restituiti sono filtrati con una soglia
+\texttt{RAG\_SCORE\_THRESHOLD~=~0.15} sulla distanza coseno: il valore è
+permissivo, in coerenza con la decisione di delegare al
+modello generativo (vincolato dal \emph{system prompt}) la decisione su
+quali chunk siano effettivamente utili. L'aspettativa è che un modello in
+modalità a bassa temperatura (Sez.~\ref{subsec:coopolicy-generation})
+sappia rifiutare contesto irrilevante, mentre una soglia troppo restrittiva
+rischia di escludere materiale marginalmente rilevante che però contiene
+la risposta. I risultati di primario e secondario vengono uniti,
+deduplicati per testo identico, ordinati per distanza coseno crescente
+e troncati a \texttt{RAG\_TOP\_K} chunk totali.
+
+\subsection{Arricchimento dei chunk e gestione dei metadati}
+\label{subsec:coopolicy-meta}
+
+Ogni PDF nel bucket GCS è accompagnato da un sidecar \texttt{.meta.json}
+generato in fase di ingestione, contenente titolo leggibile e data del
+documento. La funzione \texttt{\_enrich\_chunks\_with\_meta} scarica in
+parallelo i sidecar dei chunk recuperati, con cache in-memory a TTL
+un'ora, e arricchisce ciascun chunk con il titolo (dato che molti documenti avevano
+nativamente nomi in esadecimale senza senso compiuto) e con la
+data; quest'ultima è poi utilizzata dal modello per privilegiare la
+fonte più recente in caso di ridondanza informativa. I file di metadati
+(\texttt{.json}) e i tabulari grezzi (\texttt{.csv}), che possono
+finire indicizzati per altri motivi, sono filtrati esplicitamente prima
+di costruire il prompt, evitando che il modello citi rumore.
+
+\subsection{Generazione vincolata e citazioni}
+\label{subsec:coopolicy-generation}
+
+Il prompt di sistema impone, in italiano, otto regole non negoziabili:
+analisi integrale dei documenti recuperati prima di rispondere; risposta
+basata esclusivamente sul materiale fornito; obbligatoriet\`a delle
+citazioni \texttt{[N]} inline; massima precisione su numeri, articoli e
+condizioni; divieto esplicito di parafrasi libere; tono professionale
+italiano; consapevolezza temporale (preferire la fonte più recente,
+avvisare se il documento ha più di due anni). Il modello è selezionato con
+lo stesso classificatore di complessità descritto per Vera
+(Sez.~\ref{subsec:vera-routing}): Gemini~2.5 Flash per richieste semplici,
+Gemini~2.5 Pro per quelle complesse,
+con \texttt{temperature = 0.1} e \texttt{max\_output\_tokens = 8192}. La
+temperatura quasi zero massimizza l'aderenza al prompt e riduce
+ulteriormente il rischio di allucinazione~\cite{xu2024hallucination}, in
+linea con la funzione di un agente di tipo ``ricerca verificabile''.
+
+Il post-processing della risposta è il dispositivo che garantisce
+l'integrità delle citazioni. Le citazioni multiple
+(\texttt{[1, 2, 3]}) vengono espanse in citazioni singole
+(\texttt{[1][2][3]}); le citazioni con indice fuori dal range dei
+documenti realmente forniti, se presenti,
+vengono rimosse dal testo finale; gli indici sono infine rinumerati
+in ordine di prima comparsa, in modo che la lista delle fonti
+restituita al frontend rispecchi l'ordine di lettura. Per ciascuna
+citazione viene anche estratto uno \emph{snippet} di 300~caratteri
+centrato sulle keyword della query, utile per la \emph{preview} nel
+frontend.
+
+\subsection{ACL e proxy autenticato per i documenti}
+\label{subsec:coopolicy-acl}
+
+Il controllo di accesso avviene a monte, nel frontend orchestrato da
+Orion: l'agente \texttt{coopolicy} è incluso nella lista degli agenti
+disponibili solo per gli utenti che appartengono ad almeno un gruppo
+Entra~ID presente nella \emph{whitelist} \texttt{DOCS\_ALLOWED\_GROUPS}.
+Gli utenti non autorizzati non vedono l'agente e non possono quindi
+raggiungerlo, eliminando la necessità di verifiche ridondanti a livello
+di singolo endpoint. L'accesso al PDF originale, infine, non
+avviene tramite URL pubblico: l'endpoint \texttt{/api/docs/file} agisce
+come proxy autenticato che, verificato il token, ottiene un \emph{access
+token} cloud-platform tramite le credenziali del service account del
+servizio e scarica il binario direttamente dall'API di GCS, restituendolo
+con \texttt{Content-Disposition: inline}. Il modello non ha mai
+visibilit\`a degli URL firmati e l'utente non pu\`o aggirare la
+verifica del token visitando un link.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.68\textwidth,height=0.85\textheight,keepaspectratio]{coopolicy2}
+  \caption[Conversazione con CooPolicy: risposta da corpus policy]{Una conversazione con CooPolicy: la risposta è basata esclusivamente sui documenti del corpus RAG,
+  con citazioni numerate \texttt{[N]} che rimandano alla fonte originale.}
+  \label{fig:coopolicy_conv1}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.95\textwidth,keepaspectratio]{coopolicy3}
+  \caption[Pannello delle fonti di CooPolicy]{Il pannello delle fonti restituito da CooPolicy: ogni citazione numerata rimanda al documento originale,
+  accessibile tramite il pulsante ``Apri PDF'' servito dal proxy autenticato verso GCS (Sez.~\ref{subsec:coopolicy-acl}).}
+  \label{fig:coopolicy_conv2}
+\end{figure}
+
+% =====================================================================
+\section{AllyCare / NPS --- Text-to-SQL sui dati dei sondaggi}
+\label{sec:agenti-allycare-arch}
+% =====================================================================
+\label{sec:agenti-allycare-impl}
+
+AllyCare è la realizzazione del paradigma Text-to-SQL
+(Sez.~\ref{subsec:bg-text2sql}) su BigQuery per l'analisi dei sondaggi NPS.
+L'implementazione espone al modello tre \emph{tool} di interazione con i
+dati e affida all'\emph{agentic loop} di ADK la gestione del ciclo ReAct
+(Sez.~\ref{sec:bg-multiagent}).
+
+\subsection{Caso d'uso e requisiti}
+\label{subsec:allycare-caso-uso}
+
+L'agente è specializzato nell'analisi dei dati dei sondaggi NPS (Net Promoter Score) condotti dall'organizzazione.
+La base dati di appoggio è in formato tabellare e sottoposta ad aggiornamento costante:
+nei sondaggi, oltre a chiedere un voto per ognuno dei vari aspetti dell'esperienza di acquisto, viene lasciata la possibilità di compilare
+un campo di testo libero con ciò che l'utente ritiene di segnalare.
+Un flusso LLM dedicato analizza i commenti presenti e li cataloga in base a delle tabelle specifiche (reparto e argomento di riferimento, valutazione del sentiment del commento, e così via)
+e infine compila una tabella ``ai enriched'' che comprende sia tutti i dati di base di ogni singola risposta (voti etc) che i nuovi ``tag'' generati.
+
+L'agente AllyCare ha lo scopo di facilitare le analisi su questa tabella:
+deve svolgere sia compiti che tradizionalmente avrebbero richiesto la creazione di reportistica ad hoc
+(risposta a domande quantitative come ``numero di voti positivi per il periodo X, per il negozio Y'', e così via,
+oppure creazione di grafici di andamento nel tempo), sia compiti di analisi qualitativa
+che richiederebbero molto tempo: domande come ``elenca le maggiori criticità nella regione / negozio specifico'' e simili.
+
+La richiesta dell'utente deve quindi essere tradotta dal modello in una (o più) query SQL adeguate,
+che vengono poi eseguite e il cui risultato viene utilizzato
+per fornire la risposta e le successive analisi.
+
+\subsection{Iniezione selettiva dello schema}
+\label{subsec:allycare-schema}
+
+Il prompt di sistema include lo schema BigQuery delle due tabelle
+rilevanti (\texttt{mapp\_nps\_survey\_internal\_prod} con i dati di
+sondaggio grezzi e \texttt{mapp\_nps\_survey\_ai\_enriched\_prod} con i
+campi prodotti da una pipeline di arricchimento AI a monte) ottenuto via
+\texttt{bq\_client.get\_table} e mantenuto in cache per un'ora. Allo
+schema tecnico viene affiancato un \emph{glossario semantico} in
+italiano: per ciascuna colonna è descritto il significato funzionale
+(es. \texttt{voto\_item01: ``Il personale del negozio è gentile e
+competente''; valori -2 = mancata risposta, -1 = non lo so, 0--9 = voto}).
+Insieme allo schema viene iniettata anche la lista esatta delle
+descrizioni di negozio (\texttt{store\_desc}, in cache 24~ore) tratta
+direttamente da BigQuery, in modo che il modello possa risolvere
+varianti colloquiali (``Sasso'', ``Iper Bologna'') in match esatti senza
+allucinare codici. Questa strategia di \emph{schema injection
+selettiva}, in luogo dell'esposizione del catalogo completo del data
+warehouse, è coerente con la letteratura
+Text-to-SQL~\cite{pourreza2023dinsql}: meno colonne il modello vede,
+meno opportunità ha di confondersi.
+
+Il prompt impone inoltre regole di consistenza SQL specifiche del
+dominio: i filtri sui voto-item devono includere \texttt{voto\_itemXX
+>= 0} nella \texttt{WHERE} (escludendo i marcatori \texttt{-1} e
+\texttt{-2}); tutti i confronti su campi categorici testuali devono
+usare \texttt{UPPER(TRIM(...))} per neutralizzare incoerenze di
+\emph{case}; la distinzione fra \texttt{LIKE} e uguaglianza esatta
+sui nomi di negozio segue regole esplicite. L'effetto è che AllyCare
+tipicamente non sbaglia i filtri ``stupidi'' che dominano gli errori in
+Text-to-SQL applicato in dominio reale.
+
+\subsection{I \emph{tool} disponibili l'\emph{agentic loop} ADK}
+\label{subsec:allycare-tools}
+
+Lo strato di tool è dichiarato in \texttt{tools.py} ed esporta tre
+funzioni Python registrate come \emph{ADK tools}:
+
+\begin{description}
+  \item[\texttt{run\_sql(query)}]
+    Esegue una query SQL su BigQuery con un \emph{guard} sintattico: la
+    query è parsificata con \texttt{sqlparse} e respinta se contiene
+    \texttt{DDL} o \texttt{DML} di scrittura
+    (\texttt{INSERT}/\texttt{UPDATE}/\texttt{DELETE}); se non già
+    presente, viene aggiunto un \texttt{LIMIT~5000}; il job è eseguito
+    con \texttt{maximum\_bytes\_billed = 10\textsuperscript{9}} per
+    bloccare query accidentalmente costose. Il risultato è restituito
+    al modello come tabella Markdown delle prime 750~righe, con
+    indicazione del totale; la copia completa del DataFrame è
+    memorizzata nello \texttt{tool\_context.state} per essere
+    riutilizzata da \texttt{generate\_chart} senza una seconda
+    interrogazione. Se la query produce un errore SQL, il messaggio
+    viene impacchettato come \texttt{function\_response} e il modello
+    può auto-correggersi al ciclo successivo: questo è il meccanismo
+    concreto di \emph{self-correction}~\cite{pourreza2023dinsql}.
+  \item[\texttt{analyze\_comments(query, question)}]
+    Estrae un campione di commenti testuali grezzi mediante una query
+    dedicata, ne preleva un sotto-campione casuale di al più 200 record
+    e chiede a Gemini~2.5 Pro una sintesi qualitativa con citazioni
+    \emph{verbatim}. Il prompt di analisi è scritto in modo da essere
+    integrato nella risposta più ampia e da non duplicare l'intestazione
+    di sezione. È usato esclusivamente per analisi qualitative: per
+    qualunque dato quantitativo (sentiment, conteggi di temi, percentuali)
+    il prompt di sistema impone \texttt{run\_sql} sulla tabella
+    \texttt{ai\_enriched\_prod}.
+  \item[\texttt{generate\_chart(visualization\_goal)}]
+    Costruisce un grafico Matplotlib/Seaborn a partire dal DataFrame
+    cachato dall'ultimo \texttt{run\_sql}, scegliendo la rappresentazione
+    in funzione di parole-chiave nel \emph{goal}
+    (\texttt{torta}/\texttt{pie} $\rightarrow$ pie chart;
+    \texttt{linee}/\texttt{trend} $\rightarrow$ line chart; default
+    $\rightarrow$ bar chart). Il grafico è codificato in PNG, convertito
+    in base64 con prefisso \emph{data URI} e iniettato nel session state.
+    Il backend lo restituisce poi nella risposta come campo
+    \texttt{chart\_and\_data}, lasciando il rendering alla logica del
+    frontend. Il chart viene incluso nel payload finale solo se
+    \texttt{generate\_chart} è stato effettivamente invocato nel turno,
+    evitando di restituire il grafico del turno precedente.
+\end{description}
+
+L'\emph{agentic loop} è governato dal \texttt{Runner} ADK che, a partire
+dall'\texttt{LlmAgent} configurato con i tre tool e con il prompt di
+sistema, alterna in modo trasparente fasi di ragionamento e chiamate a
+tool fino a quando il modello restituisce la risposta finale. Il
+modello scelto per il turno (Pro o Flash) è iniettato nell'agente al
+momento della costruzione, e il prompt di sistema include il nome
+proprio dell'utente e la sua direzione (estratti dal token Entra ID),
+così che il tono della risposta sia personalizzato.
+
+La selezione del modello segue lo stesso schema adottato per SysAid
+(Sez.~\ref{subsec:sysaid-arch-unificata}): il campo \texttt{complexity}
+propagato da Orion determina se il turno è servito da Gemini~2.5 Flash
+(\texttt{low}) o Gemini~2.5 Pro (\texttt{high}). Quando AllyCare è
+usato in modalità standalone, la complessità è stimata localmente dal
+modello Flash con una chiamata di classificazione dedicata,
+coerentemente con il pattern già descritto per SysAid.
+
+\subsection{Disciplina del ragionamento, anti-allucinazione}
+\label{subsec:allycare-discipline}
+
+La ``gerarchia della verità'' codificata nel prompt impone che i dati
+del database siano la sola fonte autoritativa: il modello non può
+classificare commenti per produrre numeri (la categorizzazione
+quantitativa va sempre dalla tabella arricchita). Una regola di
+``fiducia nel tool'' impone inoltre che, se \texttt{run\_sql} ha
+restituito un dato, sia quel dato a essere riportato, anche se il
+modello ``ricorda'' numeri diversi da turni precedenti. Questo accorgimento
+ha, ad esempio, eliminato in fase di test una classe di errori in cui il modello,
+ricalcolando mentalmente, contraddiceva il proprio tool.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.68\textwidth,height=0.85\textheight,keepaspectratio]{nps2}
+  \caption[Conversazione con AllyCare: analisi quantitativa]{Una conversazione con AllyCare: la richiesta di analisi NPS produce una sezione di \emph{ragionamento}
+  esplicito (con la strategia SQL adottata) seguita da una risposta numerica strutturata (punteggio NPS, suddivisione promotori/passivi/detrattori).}
+  \label{fig:allycare_conv1}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.6\textwidth,height=0.8\textheight,keepaspectratio]{nps5}
+  \caption[AllyCare: grafico generato dinamicamente]{AllyCare genera dinamicamente un grafico (qui un grafico a torta della distribuzione del \emph{sentiment} dei commenti) a
+  partire dai dati estratti via SQL, codificandolo come immagine restituita al frontend.}
+  \label{fig:allycare_chart}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.68\textwidth,height=0.85\textheight,keepaspectratio]{nps4}
+  \caption[Conversazione con AllyCare: analisi qualitativa dei commenti]{AllyCare in modalità analisi qualitativa: i commenti testuali liberi del sondaggio sono sintetizzati per tema,
+  con la relativa distribuzione di \emph{sentiment}, senza produrre numeri non supportati dalla tabella arricchita.}
+  \label{fig:allycare_conv2}
+\end{figure}
+
+% =====================================================================
+\section{SysAid --- Text-to-SQL sul ticketing con modelli LLM distinti}
+\label{sec:agenti-sysaid-arch}
+% =====================================================================
+\label{sec:agenti-sysaid-impl}
+
+SysAid è l'agente in cui il principio di indipendenza dal fornitore di LLM
+trova la sua realizzazione più esplicita, con un backend unificato che
+ospita due code path alimentate da fornitori concorrenti.
+
+\subsection{Caso d'uso e requisiti}
+\label{subsec:sysaid-caso-uso}
+
+SysAid è l'agente specializzato nell'analisi della base dati di ticketing dell'organizzazione.
+Anche in questo caso, la base dati di appoggio è in formato tabellare: è una copia ``in streaming'' in tempo reale del database effettivo del servizio.
+
+L'agente deve facilitare le analisi su questa base dati, svolgendo anche in questo caso sia compiti che tradizionalmente
+avrebbero richiesto la creazione di reportistica ad hoc
+(numeriche, andamenti, tempi di risoluzione...), sia compiti di analisi qualitativa che richiederebbero molto tempo:
+domande come ``elenca le maggiori criticità nella regione / negozio specifico''.
+Inoltre data la presenza di dati realtime, deve essere in grado di fornire informazioni sullo stato di salute attuale
+dei sistemi informativi così da fornire supporto al troubleshooting.
+Una fascia di utenza ideale, oltre al management, è quella del personale del Service Desk.
+
+Anche in questo caso, la richiesta dell'utente deve quindi essere tradotta dal modello in una (o più) query SQL adeguate,
+che vengono poi eseguite e il cui risultato viene utilizzato per fornire la risposta e le successive analisi.
+
+\subsection{Pluralità del modello nel routing}
+\label{subsec:agenti-sysaid-confronto}
+
+SysAid deve implementare in modo più esplicito il principio di indipendenza dal fornitore di LLM.
+Il backend deve essere realizzato come servizio unificato che ospita due code parallele, alimentate da due fornitori concorrenti:
+Gemini 2.5 Flash su Vertex AI~\cite{gcp_vertexai} per le richieste a bassa complessità e
+Claude Sonnet su AnthropicVertex~\cite{anthropic_docs} per le richieste ad alta complessità;
+Gemini Flash si deve occupare anche della valutazione della complessità.
+
+Entrambe le code path condividono la medesima base di conoscenza, la stessa struttura di database,
+i medesimi strumenti per l'analisi dei dati e l'interfaccia utente.
+
+\subsection{Architettura del backend unificato}
+\label{subsec:sysaid-arch-unificata}
+
+Il backend unificato condivide fra le due code path tutti gli elementi non
+legati al fornitore del modello: schema BigQuery (vista \texttt{service\_req\_view}
+sulla base ticket SysAid), prompt di sistema, set di tool
+(\texttt{run\_sql}, \texttt{analyze\_text}, \texttt{generate\_chart}),
+conversazioni e interfaccia utente React. Il routing interno avviene
+all'ingresso dell'endpoint \texttt{/api/sysaid/prompt}: il campo
+\texttt{complexity} determina quale code path viene percorso.
+
+\begin{table}[htbp]
+  \centering
+  \caption[Code path nel backend SysAid unificato]{Confronto fra le due
+    code path ospitate nel backend SysAid unificato. La logica di business
+    è condivisa; le differenze riguardano esclusivamente il fornitore di LLM.}
+  \label{tab:sysaid-confronto}
+  \begin{tabular}{lll}
+    \toprule
+    \textbf{Dimensione}      & \textbf{Code path Gemini (low)} & \textbf{Code path Sonnet (high)}  \\
+    \midrule
+    Modello LLM              & Gemini 2.5 Flash                & Claude Sonnet 4.6                 \\
+    Piattaforma              & Vertex AI (\texttt{europe-west8}) & AnthropicVertex (\texttt{europe-west1}) \\
+    SDK                      & Google ADK nativo               & Anthropic SDK + thin adapter      \\
+    Schema dei tool          & \texttt{FunctionDeclaration}    & JSON Schema                       \\
+    Stop reason tool         & \texttt{function\_call} part    & \texttt{stop\_reason = tool\_use} \\
+    Schema BigQuery          & \multicolumn{2}{c}{Condiviso}                                      \\
+    Prompt di sistema        & \multicolumn{2}{c}{Identico}                                       \\
+    Tool disponibili         & \multicolumn{2}{c}{\texttt{run\_sql}, \texttt{analyze\_text}\footnotemark, \texttt{generate\_chart}} \\
+    Frontend React           & \multicolumn{2}{c}{Unico}                                          \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+\footnotetext{L'interfaccia dei tool è condivisa, ma \texttt{analyze\_text}
+  utilizza internamente il modello LLM della rispettiva code path: Gemini~2.5
+  Flash nel percorso Gemini, Claude Sonnet~4.6 nel percorso Sonnet.}
+
+Una nota architetturale è la differenza di regione GCP fra le
+due code path: Gemini è disponibile in \texttt{europe-west8}, mentre
+Claude Sonnet su Vertex è offerto al momento solo in
+\texttt{europe-west1}. Entrambe le regioni si trovano nel perimetro
+europeo e soddisfano il requisito di sovranità del dato.
+
+\subsection{Code path Gemini: integrazione ADK nativa}
+\label{subsec:sysaid-gemini}
+
+La code path Gemini utilizza appieno il \emph{Google Agent Development Kit} (ADK)
+per l'astrazione del modello e l'orchestrazione del \emph{function calling}. I tool sono
+registrati nativamente tramite i decoratori e le classi fornite dall'SDK,
+delegando all'\emph{agentic loop} di ADK la gestione del ciclo Reason-Act-Observe.
+Il modello è configurato con \texttt{temperature = 0},
+che, in continuità con CooPolicy e con la letteratura sulla
+calibrazione~\cite{kadavath2022knowsknows}, riduce la varianza
+dell'output e rende riproducibile il comportamento su query
+identiche.
+
+\subsection{Code path Sonnet: astrazione tramite adapter}
+\label{subsec:sysaid-sonnet}
+
+La code path Sonnet accede a Claude Sonnet
+instradando le chiamate verso \texttt{AnthropicVertex},
+l'integrazione che permette di chiamare i modelli Anthropic mantenendo l'autenticazione, i dati
+e la fatturazione all'interno del progetto GCP~\cite{anthropic_docs}. Poiché le API di Anthropic
+e i formati di tool calling differiscono parzialmente dallo standard Gemini,
+l'implementazione fa uso di un \emph{thin adapter} per uniformare la semantica.
+
+\paragraph{Definizione dei tool.} I tool rimangono concettualmente identici e
+vengono traslati nel formato JSON~Schema richiesto da Claude.
+
+\paragraph{Ciclo e \texttt{stop\_reason}.} L'agentic loop si adatta per interpretare
+lo \texttt{stop\_reason = "tool\_use"} caratteristico di Anthropic.
+L'esecuzione del loop rimane gestita centralmente, garantendo lo stesso limite di iterazioni
+e lo stesso approccio strutturato visto nella code path Gemini. Quando il tool loop termina,
+un \emph{guardrail} specifico verifica la corretta conformità del Markdown di output, forzando
+se necessario un retry automatico del modello in caso di fallimenti semantici o assenza di esecuzione SQL.
+
+\paragraph{Serializzazione dei content block.} L'SDK Anthropic
+restituisce content block che includono campi interni
+(\texttt{caller}, \texttt{parsed\_output}, \ldots) non accettati dall'API
+quando il blocco viene rispedito come parte dell'history. Per evitare
+errori 400, un helper applica una
+\emph{whitelist} per tipo di blocco
+(\texttt{text}, \texttt{tool\_use}, \texttt{tool\_result},
+\texttt{image}) che mantiene solo i campi documentati.
+
+\paragraph{Gestione di output lunghi.} Per
+sostenere \texttt{max\_tokens = 32000} senza incorrere in timeout
+dell'SDK, il backend usa internamente l'API \emph{streaming} di
+Anthropic (\texttt{messages.stream}), accumulando il messaggio finale
+prima di processarlo nel loop. Quando \texttt{stop\_reason = "max\_tokens"},
+il backend aggiunge un messaggio utente ``Continua\ldots'' e ripete il giro, in
+analogia con il meccanismo di continuation di Vera (Sez.~\ref{subsec:vera-paths}).
+
+L'effetto netto dell'architettura unificata è che la logica di business
+(esecuzione SQL, analisi testuale, grafici, persistenza) è scritta una sola volta;
+gli adattamenti rispetto al fornitore restano localizzati alla traduzione
+di schema dei tool, all'ispezione dei \texttt{stop\_reason} e alla
+serializzazione dei content block. Aggiungere un terzo fornitore richiederebbe
+un nuovo adapter, non una riscrittura della logica.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.68\textwidth,height=0.85\textheight,keepaspectratio]{sysaid3}
+  \caption[Conversazione SysAid: code path Gemini Flash]{SysAid con code path Gemini~2.5 Flash per una richiesta a bassa complessità:
+  la query SQL è eseguita con bassa latenza e il risultato è qui reso come grafico a torta della distribuzione degli stati dei ticket.}
+  \label{fig:sysaid_conv_gemini}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.68\textwidth,height=0.85\textheight,keepaspectratio]{sysaid2}
+  \caption[Conversazione SysAid: code path Claude Sonnet]{SysAid con code path Claude Sonnet~4.6 per una richiesta ad alta complessità:
+  la logica di business è identica alla code path Gemini; cambia solo il modello che esegue il ragionamento e la generazione SQL.}
+  \label{fig:sysaid_conv_sonnet}
+\end{figure}
+
+% =====================================================================
+\section{Pannello di amministrazione}
+\label{sec:agenti-admin-impl}
+% =====================================================================
+
+Il monitoraggio e la configurazione della suite sono affidati a un pannello
+di amministrazione dedicato a Vera (\texttt{admin-backend} +
+\texttt{admin-frontend}),  isolato dagli applicativi
+rivolti all'utente finale. Il backend FastAPI espone i propri router sotto
+il prefisso \texttt{/api/admin/} e offre le seguenti funzionalità:
+la gestione dei budget token per utente (con la tabella condivisa
+\texttt{token\_budget} descritta sopra), le statistiche di consumo aggregate,
+i log audit delle conversazioni con il feedback strutturato degli utenti,
+la configurazione dei gruppi di esenzione PII e la gestione dei template
+Model Armor e DLP (Sensitive Data Protection).
+
+Il pannello di Orion, descritto nel
+Cap.~\ref{chap:orion}, replica le stesse funzionalità
+e aggiunge le pagine specifiche per la valutazione del routing.
+
+La qualità di questi agenti (accuratezza delle query Text-to-SQL di
+AllyCare e SysAid e fedeltà delle risposte RAG di CooPolicy) è valutata
+nel Capitolo~\ref{chap:orion-valutazione}
+(Sez.~\ref{sec:eval-agenti}).
+
+% =====================================================================
+\section{Alternative scartate}
+\label{sec:agenti-alternative}
+% =====================================================================
+
+Questa sezione documenta le principali alternative considerate e le
+ragioni per cui non sono state adottate.
+
+\paragraph{Orchestratore centrale fin dalla versione~1.}
+La prima alternativa valutata era introdurre un orchestratore
+intelligente già nella versione iniziale della suite, ispirato
+ai pattern multi-agente proposti dalla letteratura recente~\cite{wu2023autogen,guo2024multiagent,wang2024moa}, eliminando la
+necessità per l'utente di selezionare esplicitamente l'agente. Questa
+opzione è stata inizialmente scartata per una ragione metodologica: costruire
+contemporaneamente gli agenti specializzati e il loro orchestratore
+avrebbe reso molto più difficile isolare e diagnosticare i problemi e probabilmente avrebbe
+condotto a performance degli agenti ``verticali'' molto meno ottimizzate.
+Validare ogni agente indipendentemente è molto più semplice in un contesto ``verticale'' isolato.
+L'orchestratore è stato quindi introdotto solo a valle della validazione
+dei singoli agenti, ed è oggetto del Capitolo~\ref{chap:orion}.
+
+\paragraph{Fine-tuning o training di un modello proprietario o open source.}
+Un'altra alternativa esplorata nella fase di analisi iniziale è stata quella di
+addestrare
+un modello sui dati interni dell'organizzazione, per creare un LLM
+specializzato sul dominio aziendale.
+Questa opzione è stata scartata
+per tre ragioni. In primo luogo, il costo di addestramento e
+mantenimento di un modello su scala enterprise è proibitivo per
+un'organizzazione che non ha nel proprio core business lo sviluppo
+di modelli AI: non è presente hardware adeguato (il core business della cooperativa è ben diverso)
+e acquisirlo, sia on-premises che cloud, comporterebbe costi non giustificabili.
+In secondo luogo, il fine-tuning non risolve il
+problema fondamentale del knowledge cutoff: un modello addestrato sui
+dati di sei mesi fa non conosce i ticket aperti questa settimana, né
+le policy aggiornate ieri. Il grounding è
+la risposta corretta per i dati che cambiano nel tempo.

@@ -96,14 +96,14 @@ I contributi specifici sono tre:
   Vera (generalista con Web grounding e RAG per-utente), CooPolicy (RAG su corpus documentale condiviso), 
   AllyCare (Text-to-SQL su dati NPS), SysAid (Text-to-SQL unificato con due fornitori di LLM) realizzati su infrastruttura cloud-native
   e dotati di autenticazione federata, catena di sicurezza e pipeline CI/CD. 
-  Capitoli~\ref{chap:agenti-architettura} e~\ref{chap:agenti-implementazione}.
+  Capitolo~\ref{chap:agenti}.
 
   \item \textbf{Progettazione, implementazione e valutazione dell'orchestrazione.} 
   Un orchestratore LLM-based che instrada le richieste sulla base di una stima di intento, complessità e confidenza, 
   con meccanismo di clarification quando l'ambiguità è alta. 
   La capacità generalista di Vera confluisce in Orion come opzione \texttt{self} (gestione delle richieste non specialistiche e fallback): 
   il router instrada quindi tra \texttt{self}, \texttt{sysaid}, \texttt{allycare} e \texttt{coopolicy}. 
-  Capitoli~\ref{chap:orion-architettura} e~\ref{chap:orion-implementazione}.
+  Capitolo~\ref{chap:orion}.
 
   \item \textbf{Una metodologia di valutazione del routing.} 
   Basata su un gold standard configurabile e su un system prompt adattabile
@@ -152,31 +152,27 @@ completa e collocata in un contesto reale.
 \label{sec:struttura}
 % =====================================================================
 
-La tesi è organizzata in otto capitoli.
+La tesi è organizzata in sei capitoli.
 
-Il \textbf{Capitolo~\ref{chap:background}} introduce i concetti necessari per apprezzare i contributi: 
-architettura Transformer, capacità e limiti degli LLM, prompt engineering e output strutturato, 
-grounding nelle tre forme (Web, RAG, Text-to-SQL), 
-architetture multi-agente, LLM routing, stima dell'incertezza, sicurezza e compliance, 
+Il \textbf{Capitolo~\ref{chap:background}} introduce i concetti necessari per apprezzare i contributi:
+architettura Transformer, capacità e limiti degli LLM, prompt engineering e output strutturato,
+grounding nelle tre forme (Web, RAG, Text-to-SQL),
+architetture multi-agente, LLM routing, stima dell'incertezza, sicurezza e compliance,
 identity federation e infrastruttura cloud.
 
-Il \textbf{Capitolo~\ref{chap:agenti-architettura}} presenta i principi guida 
-e le scelte architetturali della suite di agenti verticali: 
-principi etici, governance, agnosticità, sovranità del dato, 
-modularità verticale, automazione dei rilasci e controllo degli accessi.
+Il \textbf{Capitolo~\ref{chap:agenti}} presenta la suite di agenti verticali,
+dai principi guida (principi etici, governance, agnosticità, sovranità del dato,
+modularità verticale, automazione dei rilasci e controllo degli accessi)
+alle fondazioni trasversali (stack tecnologico, organizzazione multi-repository,
+infrastruttura Terraform, pipeline CI/CD, identità e catena di sicurezza),
+fino ai dettagli realizzativi dei quattro agenti.
 
-Il \textbf{Capitolo~\ref{chap:agenti-implementazione}} descrive l'implementazione della suite: 
-stack tecnologico, organizzazione multi-repository, infrastruttura Terraform, 
-pipeline CI/CD, catena di sicurezza e dettagli implementativi dei quattro agenti.
-
-Il \textbf{Capitolo~\ref{chap:orion-architettura}} presenta l'architettura dell'orchestratore: motivazione, 
-routing step con output strutturato, logica di confidence e clarification, 
-agent proxy, gestione dell'identità e della storia conversazionale.
-
-Il \textbf{Capitolo~\ref{chap:orion-implementazione}} descrive l'implementazione dell'orchestratore: 
-router agent, agent proxy, endpoint di chat con routing integrato, 
-frontend con badge trasparente, admin panel con pagina di valutazione, 
-infrastruttura Terraform e schema del database.
+Il \textbf{Capitolo~\ref{chap:orion}} presenta l'orchestratore Orion:
+motivazione e posizionamento rispetto alla letteratura,
+routing step con output strutturato e logica di confidence e clarification,
+agent proxy, gestione della storia conversazionale,
+frontend con badge trasparente, admin panel,
+infrastruttura e schema del database.
 
 Il \textbf{Capitolo~\ref{chap:orion-valutazione}} presenta la valutazione sperimentale su tre piani: 
 il routing dell'orchestratore (domande di ricerca, gold standard, metriche dichiarate a priori, 

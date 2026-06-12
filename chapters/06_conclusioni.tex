@@ -1,0 +1,112 @@
+% !TEX root = ../main.tex
+% =====================================================================
+% CAPITOLO 6 — CONCLUSIONI E SVILUPPI FUTURI
+% =====================================================================
+
+\chapter{Conclusioni e sviluppi futuri}
+\label{chap:conclusioni}
+
+% =====================================================================
+\section{Sintesi dei contributi}
+\label{sec:concl-sintesi}
+% =====================================================================
+
+Questa tesi ha affrontato il problema dell'adozione enterprise dell'AI generativa attraverso la progettazione, 
+l'implementazione e la valutazione di un sistema multi-agente orchestrato, 
+realizzato per Coop Alleanza 3.0. 
+
+I contributi sono tre, in ordine di centralità.
+
+\paragraph{1. Suite di agenti verticali specializzati.} Il Capitolo~\ref{chap:agenti} ha descritto la progettazione e l'implementazione di quattro agenti,
+ciascuno con la propria forma di grounding (Web, RAG, Text-to-SQL), serviti da un'infrastruttura cloud-native interamente descritta in Terraform, 
+con autenticazione federata, catena di sicurezza pre e post generazione e pipeline CI/CD automatizzata.
+
+La scelta di agenti verticali indipendenti ha questi punti di forza: ogni agente può essere aggiornato, scalato e monitorato indipendentemente; 
+il prompt di ciascun agente è ottimizzato per il proprio dominio; è dimostrata, con la coesistenza di Gemini e Claude in uno stesso agente,
+la possibilità di evitare il vendor lock-in.
+
+\paragraph{2. Orchestratore Orion.} Il Capitolo~\ref{chap:orion} ha presentato Orion,
+un orchestratore LLM-based che instrada le richieste dell'utente verso l'agente specializzato più appropriato. 
+L'architettura si fonda su un routing step che produce un output strutturato con cinque campi (agente target, complessità, confidence, reasoning, clarification), 
+eseguito da Gemini~2.5 Flash con guided generation. Il meccanismo di confidence con soglia configurabile consente al sistema di porre domande di chiarimento quando l'ambiguità è alta, 
+in un'implementazione del principio di \emph{active learning} applicato al routing.
+
+Il proxy normalizza le risposte eterogenee dei sub-agenti verso un formato uniforme per il frontend, 
+e l'autenticazione service-to-service basata sull'ingress Cloud Run elimina la complessità del token forwarding. 
+Il pannello di amministrazione consente di visualizzare i log di routing, modificare il system prompt del router senza rilascio di codice, 
+e lanciare la valutazione automatica direttamente dal browser.
+
+\paragraph{3. Metodologia di valutazione del routing.} Il Capitolo~\ref{chap:orion-valutazione} ha introdotto una metodologia per la valutazione sistematica del routing, 
+basata su un gold standard di 120~test case, uno strumento di esecuzione automatica integrato nell'admin panel e cinque metriche dichiarate a priori
+(agent accuracy, complexity accuracy, clarification rate, mean confidence sui casi corretti e mean confidence sui casi errati). 
+La metodologia ha consentito di misurare l'effetto di un'iterazione del system prompt del router: 
+agent accuracy stabile al $99{,}2\%$ e complexity accuracy dall'$88{,}3\%$ al $93{,}3\%$ tra le versioni v1.0 e v1.1, sopra i rispettivi target.
+
+A complemento della valutazione del routing, il Capitolo~\ref{chap:orion-valutazione} riporta anche una valutazione quantitativa della qualità dei sub-agenti: 
+execution accuracy dell'$80$--$84\%$ per gli agenti Text-to-SQL e, per il RAG, faithfulness $0{,}73$ con answer rate del $100\%$ sulle domande in corpus (Sez.~\ref{sec:eval-agenti}), 
+e una valutazione economica indicativa (Sez.~\ref{sec:eval-costi}) che dà sostanza alla motivazione di costo: nello scenario illustrativo considerato, 
+una piattaforma a consumo risulta di circa un fattore 40 più economica delle licenze SaaS nominali per l'intera popolazione, 
+vantaggio che deriva dal modello di tariffazione (uso effettivo contro disponibilità per utente) più che dalla tecnologia.
+
+% =====================================================================
+\section{Generalizzabilità del pattern}
+\label{sec:concl-generalizzabilita}
+% =====================================================================
+
+L'architettura proposta non è legata in modo essenziale al dominio dell'organizzazione. I pattern emersi (agenti verticali con grounding eterogeneo, orchestratore LLM-based con confidence calibration, 
+valutazione sistematica del prompt) sono riutilizzabili in ogni organizzazione con caratteristiche di questo tipo:
+
+\begin{itemize}
+  \item Infrastruttura cloud consolidata (non necessariamente GCP: i pattern architetturali sono portabili su Azure o AWS) o specifica per AI on premises.
+  \item Difficoltà economica o normativa nell'adottare licenze SaaS nominali per l'intera popolazione aziendale.
+  \item Patrimonio informativo eterogeneo: documenti non strutturati (policy, procedure), dati strutturati (ticket, sondaggi) e necessità di accesso a informazioni pubbliche attuali.
+  \item Vincoli di compliance e sovranità del dato che richiedono il controllo completo dell'infrastruttura e del flusso dei dati.
+\end{itemize}
+
+Il codice sorgente completo del progetto, anonimizzato e reso indipendente dal contesto organizzativo specifico,
+è pubblicato nel repository \url{https://github.com/dpiccinelli84/unibo-thesis-src} per consentire la riproducibilità. 
+Il repository include anche il modulo \texttt{evaluation/}, con gli script e i gold standard delle valutazioni di qualità degli agenti (Sez.~\ref{sec:eval-agenti}) 
+e il calcolatore del modello di costo (Sez.~\ref{sec:eval-costi}).
+
+% =====================================================================
+\section{Sviluppi futuri}
+\label{sec:concl-futuri}
+% =====================================================================
+
+\subsection{Da router LLM-based a router appreso}
+\label{subsec:concl-routellm}
+
+La direzione più naturale è la transizione dal router LLM-based attuale a un router \emph{appreso}~\cite{ong2024routellm}, 
+addestrato su dati di preferenza derivati dal traffico reale. 
+Il log di routing di Orion, che registra ogni decisione con prompt, agente selezionato, confidence e reasoning, 
+è il dataset di training naturale per un classificatore supervisionato. 
+Il vantaggio atteso è duplice: riduzione della latenza (inferenza locale vs chiamata API) e riduzione del costo (nessuna chiamata Flash per il routing). 
+Il prerequisito è un volume di traffico sufficiente a produrre un dataset bilanciato su tutti gli agenti, condizione non ancora soddisfatta nella fase attuale del progetto.
+
+\subsection{Estensione della suite a nuovi domini}
+\label{subsec:concl-nuovi-domini}
+
+L'architettura modulare consente l'aggiunta di nuovi agenti specializzati senza modifiche strutturali: ogni nuovo agente richiede un backend, un frontend, 
+l'aggiornamento del prompt del router (per includere la descrizione del nuovo agente) e una regola nel bilanciatore di carico. 
+Domini candidati includono l'analisi dei turni di lavoro (già in fase prototipale), la gestione documentale SharePoint e l'analisi dei dati di vendita.
+
+\subsection{Valutazione end-to-end su traffico reale}
+\label{subsec:concl-valutazione-reale}
+
+La valutazione del routing (Sez.~\ref{sec:eval-risultati}) opera in isolamento, mentre quella dei sub-agenti (Sez.~\ref{sec:eval-agenti}) è già end-to-end ma su un gold standard statico. 
+Un'estensione naturale è la valutazione \emph{continua} sul traffico reale, con revisione umana periodica delle decisioni di routing e delle risposte degli agenti. 
+Il framework AgentBench~\cite{liu2023agentbench} fornisce un modello metodologico per questo tipo di valutazione; l'infrastruttura di logging già in essere (routing logs, chat logs, feedback utente) 
+fornisce i dati necessari.
+
+% =====================================================================
+\section{Considerazione finale}
+\label{sec:concl-finale}
+% =====================================================================
+
+L'adozione enterprise dell'AI generativa non è la scelta binaria tra ``comprare una licenza SaaS'' e ``non adottarla'': 
+è un problema di \emph{architettura dei sistemi informativi} a tutti gli effetti. 
+Posto in questi termini, ammette risposte ingegnerizzate che sono economicamente sostenibili, 
+normativamente difendibili e tecnicamente controllabili. 
+Questa tesi ha mostrato una di queste risposte e ha fornito gli strumenti per valutarla in modo sistematico. 
+Il lavoro non pretende di aver risolto il problema in modo definitivo, ma di aver dimostrato che l'approccio è praticabile, misurabile e, 
+per il contesto specifico di Coop Alleanza, preferibile alle alternative considerate.

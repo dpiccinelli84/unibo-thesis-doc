@@ -34,40 +34,28 @@ stabiliti prima di avviare lo sviluppo e mantenuti durante tutte le fasi success
 \begin{description}
 
   \item[Rispetto dei principi etici e cooperativi]
-    Gli agenti LLM sono intrinsecamente portati a esprimere bias: è un limite strutturale dei modelli generativi (Sez.~\ref{sec:bg-llm}).
-    Per Coop Alleanza è importante mitigare i possibili effetti negativi sugli utenti, caratterizzando inoltre il comportamento
-    degli agenti nel pieno rispetto dei principi etici che sono alla base della Cooperativa.
-    Mettendo a disposizione degli utenti un pacchetto di assistenti per le loro necessità, si può cercare di
-    prevenire l'utilizzo da parte loro di strumenti AI esterni pubblici e/o non autorizzati (fenomeno chiamato ``Shadow AI'').
-    Oltre alla riduzione degli evidenti rischi per la sicurezza del dato, gli strumenti a sviluppo interno possono essere ``istruiti''
-    secondo dei ``prompt di sistema'' stabiliti collegialmente fra i vari uffici interni, facendo sì
-    che le risposte prodotte siano conformi ai valori cooperativi ed etici, o comunque ai valori dell'organizzazione.
-    A tal fine, tutti i prompt di sistema dei vari agenti devono integrare direttive esplicite, volte a
-    garantire che ogni agente rifletta l'identità e i valori dell'organizzazione,
-    in conformità con i requisiti di trasparenza e \emph{human oversight} previsti dal
-    Regolamento Europeo sull'Intelligenza Artificiale~\cite{eu2024aiact},
-    mantenendo inoltre la possibilità di modifiche in corso d'opera e cicli di aggiornamento rapidi e controllati.
+    Gli agenti LLM sono intrinsecamente portati a esprimere bias (Sez.~\ref{sec:bg-llm}).
+    Offrire un pacchetto di assistenti interni mitiga questo rischio e previene insieme il
+    ricorso a strumenti AI esterni non autorizzati (\emph{Shadow AI}), riducendo i rischi per
+    la sicurezza del dato. I prompt di sistema, stabiliti collegialmente fra gli uffici interni,
+    integrano direttive esplicite che allineano ogni agente all'identità e ai valori
+    dell'organizzazione, in conformità con i requisiti di trasparenza e \emph{human oversight}
+    dell'European AI Act~\cite{eu2024aiact}, con cicli di aggiornamento rapidi e controllati.
 
   \item[Governance facilitata e efficace]
-    Gli agenti devono implementare soluzioni adeguate a prevenire utilizzi impropri e fughe di dati personali.
-    Le configurazioni relative al prompt di sistema (la ``personalità'' dell'agente) e del grado di controllo su utilizzi impropri e
-    dati personali devono essere visualizzabili e impostabili da una dashboard apposita,
-    che consenta agli uffici preposti (che non hanno competenza tecnica stretta) di controllare intuitivamente questi parametri.
-    Inoltre deve essere possibile, nel rispetto della privacy, monitorare i casi di eventi segnalati come ``pericolosi''.
-    Tutto il codice sorgente deve essere presente e aggiornato nel repository Git usato dall'organizzazione, e considerato
-    proprietà della Cooperativa.
+    Le configurazioni del prompt di sistema (la ``personalità'' dell'agente) e dei controlli su
+    utilizzi impropri e dati personali devono essere gestibili da una dashboard apposita, usabile
+    anche dagli uffici preposti privi di competenza tecnica, che consenta inoltre di monitorare
+    --- nel rispetto della privacy --- gli eventi segnalati come ``pericolosi''. Tutto il codice
+    sorgente risiede nel repository Git dell'organizzazione ed è proprietà della Cooperativa.
 
   \item[Implementazione agnostica e sostenibile]
-    Nella realtà aziendale attuale, molti fornitori propongono i propri modelli di assistenti o agenti AI.
-    Spesso questo comporta il rischio di una dipendenza (vendor lock-in) più o meno rilevante: ad esempio, le soluzioni ``out of the box''
-    risultano di difficile trasposizione verso realtà infrastrutturali diverse da quelle del fornitore.
-    Inoltre spesso sono richiesti piani di abbonamento o sottoscrizioni che possono comportare costi fissi elevati
-    anche in caso di effettivo inutilizzo dello strumento.
-    La soluzione realizzata deve essere completamente portabile e facilmente adattabile
-    verso qualunque architettura; inoltre deve consentire un controllo attivo, adattivo e dinamico dei costi, stanziando
-    periodicamente un budget di utilizzo definito dagli amministratori (``token'') per ogni utente, granularmente modificabile in
-    caso di necessità, così da garantire la sostenibilità del progetto.
-    Ovunque possibile deve essere implementato un ``routing'' che indirizzi verso modelli più semplici ed economici le richieste a bassa complessità.
+    Le soluzioni AI ``out of the box'' dei fornitori comportano spesso \emph{vendor lock-in}
+    (difficile portabilità verso altre infrastrutture) e costi fissi di sottoscrizione anche con
+    utilizzo scarso. La soluzione realizzata deve invece essere portabile verso qualunque
+    architettura e consentire un controllo dinamico dei costi: un budget di utilizzo (``token'')
+    per utente, definito dagli amministratori e modificabile alla bisogna, e ovunque possibile un
+    \emph{routing} che indirizzi le richieste a bassa complessità verso modelli più economici.
 
   \item[Sovranità del dato]
     Nessun dato deve lasciare il perimetro cloud europeo, in conformità al Regolamento Generale sulla Protezione dei Dati (GDPR).
@@ -99,16 +87,14 @@ stabiliti prima di avviare lo sviluppo e mantenuti durante tutte le fasi success
 \label{subsec:agenti-architettura-insieme}
 % =====================================================================
 
-L'ecosistema di agenti deve essere accessibile da un unico ``portale'', così che l'utente possa abituarsi all'utilizzo
-di un unico punto di accesso: è la logica conseguenza della modularità verticale descritta in precedenza.
-I nuovi agenti potranno semplicemente essere inseriti nel ``framework'' esistente.
-Lo stesso approccio vale per le dashboard di configurazione (``admin panel'') quando necessarie,
-anch'esse radunate in un portale dedicato.
+L'ecosistema è accessibile da un unico ``portale'', conseguenza diretta della modularità
+verticale: i nuovi agenti si innestano nel \emph{framework} esistente e le dashboard di
+configurazione (``admin panel'') sono radunate in un portale dedicato.
 
-Pur mantenendo come centrale e rilevante il principio della maggiore agnosticità, portabilità e indipendenza possibili,
-tutte le implementazioni saranno realizzate con le risorse disponibili sulla piattaforma Cloud di Google~\cite{gcp_vertexai,gcp_cloudrun}:
-si tratta al momento dell'unico fornitore di sistemi cloud attivo in Coop Alleanza (come approfondito anche di seguito, le risorse del data center
-on-premises, pur esistenti, non consentono una realizzazione abbordabile e performante di progetti di AI generativa).
+Pur restando centrale il principio di agnosticità e portabilità, tutte le implementazioni usano
+la piattaforma Cloud di Google~\cite{gcp_vertexai,gcp_cloudrun}, al momento l'unico fornitore
+cloud attivo in Coop Alleanza (le risorse on-premises non consentono una realizzazione
+performante e sostenibile di progetti di AI generativa).
 
 \begin{figure}[htbp]
   \centering
@@ -359,39 +345,26 @@ controllare l'accesso.
   \label{fig:login2}
 \end{figure}
 
-Il consumo di token è controllato da un servizio di quota che opera su
-una \emph{tabella condivisa} (\texttt{token\_budget}) nel database: ogni
-utente dispone di un unico budget mensile, indipendente dall'agente
-utilizzato. Prima di ogni chiamata al modello, il backend verifica che il
-budget residuo sia sufficiente; al termine contabilizza i token effettivi.
-Il budget è associato all'utente (\emph{Bronze}, \emph{Silver},
-\emph{Gold}) e modificabile dall'amministratore in caso di necessità
-eccezionali. Questo meccanismo,
-trasversale a tutti gli agenti, realizza il principio di
-\emph{Implementazione agnostica e sostenibile} enunciato fra i principi
-guida (Sez.~\ref{sec:agenti-principi}).
+Il consumo di token è controllato da un servizio di quota su una \emph{tabella condivisa}
+(\texttt{token\_budget}): ogni utente ha un budget mensile unico, indipendente dall'agente, su
+fasce (\emph{Bronze}, \emph{Silver}, \emph{Gold}) modificabili dall'amministratore. Prima di ogni
+chiamata il backend verifica il budget residuo e al termine contabilizza i token effettivi,
+realizzando trasversalmente il principio di \emph{Implementazione agnostica e sostenibile}
+(Sez.~\ref{sec:agenti-principi}).
 
-Il prompt di sistema, in ogni agente escluso CooPolicy (in cui l'ottimizzazione e l'ispezione avvengono a
-livello di ottimizzazione di ricerca RAG, più ``a monte'' rispetto al ragionamento LLM), impone una disciplina di output esplicita:
-ogni risposta deve aprirsi con una sezione \texttt{\#\#\# RAGIONAMENTO} che
-enuncia obiettivo, scelte, strategie e note appropriate;
-deve quindi chiamare il (o i) \emph{tool} appropriato; deve infine produrre la sezione
-\texttt{\#\#\# RISPOSTA} solo dopo aver ricevuto i risultati. La
-disciplina è una forma di Chain-of-Thought esplicito~\cite{wei2022cot},
-estesa con un protocollo a due tag che separano in modo riconoscibile la
-fase di pianificazione dall'output utente. Una funzione
-\texttt{\_clean\_answer} ``collassa'' il blocco di ragionamento da quanto
-viene effettivamente mostrato all'utente, in modo che la
-trasparenza sia disponibile per fare auditing ma l'esperienza utente sia pulita.
+Il prompt di sistema --- in ogni agente tranne CooPolicy, dove l'ottimizzazione avviene più a monte,
+sul retrieval RAG --- impone una disciplina di output esplicita: ogni risposta apre con una sezione
+\texttt{\#\#\# RAGIONAMENTO} (obiettivo, scelte, strategia), chiama i \emph{tool} appropriati e solo
+dopo i risultati produce la sezione \texttt{\#\#\# RISPOSTA}. È una forma di Chain-of-Thought
+esplicito~\cite{wei2022cot} con due tag che separano pianificazione e output; una funzione
+\texttt{\_clean\_answer} collassa il blocco di ragionamento da quanto mostrato all'utente,
+lasciandolo disponibile per l'auditing ma mantenendo pulita l'esperienza.
 
-I passaggi citati sono sempre racchiusi in un \texttt{try/except} che riconosce gli
-errori transitori della piattaforma di inferenza
-(\texttt{RESOURCE\_EXHAUSTED}, \texttt{429}, \texttt{503}, \emph{rate
-limit}) e li ripete con \emph{backoff} lineare fino a tre
-tentativi, evitando che picchi di traffico contro Vertex AI degradino
-la qualità di servizio percepita dall'utente. La medesima strategia di
-retry transitorio è utilizzata anche da CooPolicy nelle chiamate al RAG
-Engine, e da AllyCare e SysAid nelle chiamate SQL BigQuery.
+Le chiamate al modello sono racchiuse in un \texttt{try/except} che riconosce gli errori transitori
+(\texttt{RESOURCE\_EXHAUSTED}, \texttt{429}, \texttt{503}, \emph{rate limit}) e li ripete con
+\emph{backoff} lineare fino a tre tentativi, così che i picchi di traffico verso Vertex AI non
+degradino il servizio percepito. La stessa strategia è usata da CooPolicy verso il RAG Engine e da
+AllyCare e SysAid nelle query BigQuery.
 
 % =====================================================================
 \section{Il portale utente}
@@ -426,16 +399,13 @@ gestione dei documenti caricati dall'utente.
 \subsection{Caso d'uso e requisiti}
 \label{subsec:vera-caso-uso}
 
-Vera deve potere coprire i tipici casi d'uso per cui un utente
-potrebbe rivolgersi a un LLM esterno all'organizzazione:
-analisi e riassunto di documenti e testi, formazione e approfondimento, correzione di codice e formule e così via.
-Deve quindi supportare la possibilità per l'utente di caricare documenti tramite tecnologia RAG~\cite{lewis2020rag}
-nel maggior numero possibile di formati e, per le richieste che necessitano di informazioni attuali, deve potere accedere
-a internet attraverso il meccanismo di Web grounding~\cite{gcp_grounding} che ancora la generazione a
-risultati provenienti da Google Search e ne mitiga il rischio di allucinazione su fatti recenti.
-Quando le risposte fornite vengono tratte da documenti caricati o da internet, la fonte deve essere sempre presente e verificabile.
-Ci deve essere certezza che nello svolgere queste ricerche non possa accadere esfiltrazione
-di dati presenti in documenti o prompt caricati dall'utente, che potrebbero essere confidenziali.
+Vera deve coprire i casi d'uso tipici di un LLM generalista (analisi e riassunto di documenti,
+formazione, correzione di codice e formule e così via): supporta il caricamento di documenti via
+RAG~\cite{lewis2020rag} nel maggior numero di formati e, per le richieste che richiedono
+informazioni attuali, accede a internet via Web grounding~\cite{gcp_grounding}, ancorando la
+generazione ai risultati di Google Search. La fonte, da documento o dal web, deve essere sempre
+presente e verificabile, e va garantito che la ricerca non esfiltri i dati --- potenzialmente
+confidenziali --- presenti nei documenti o nei prompt dell'utente.
 
 \subsection{Routing del modello basato sulla complessità della query}
 \label{subsec:vera-routing}
@@ -513,41 +483,25 @@ modello in Vera attraversa una catena di controlli predisposta nel servizio
 \texttt{model\_armor\_service.py}. La catena ha tre stadi:
 
 \begin{enumerate}
-  \item \textbf{Sanitizzazione del prompt.} Prima di inviare il messaggio
-        all'LLM, il testo passa per il template di Google Cloud Model
-        Armor~\cite{gcp_modelarmor}, che combina un classificatore di
-        \emph{Responsible AI} (categorie \emph{hate}, \emph{harassment},
-        \emph{sexually explicit}, \emph{dangerous}) con il rilevatore
-        di \emph{prompt injection}~\cite{perez2022promptinjection} e con
-        la \emph{Sensitive Data Protection} di Google Cloud~\cite{gcp_dlp}
-        per le PII, in conformità con i requisiti dell'European AI
-        Act~\cite{eu2024aiact} sulla gestione del rischio. I tipi PII rilevanti per il contesto italiano (Codice
-        Fiscale, Partita IVA, IBAN) sono configurati come \emph{custom
-        info types}; quando la PII viene rilevata, il backend non
-        sostituisce ciecamente il valore ma rifiuta la richiesta con un
-        messaggio che invita l'utente a riformulare. Il rifiuto è
-        appropriato perché l'autenticità del dato originale è spesso
-        necessaria per l'utilità della risposta, e il \emph{tokenizing}
-        cieco produrrebbe risposte inutilizzabili.
-  \item \textbf{Esenzioni per gruppo.} Alcuni gruppi (ad esempio l'ufficio
-        legale) hanno legittimo bisogno di trattare PII specifiche.
-        Apposite tabelle PostgreSQL \texttt{model\_armor\_group\_exemptions}
-        e \texttt{pii\_group\_exemptions} consentono di escludere
-        per gruppo singoli filtri (ad esempio \texttt{prompt\_injection}
-        o singole categorie) o singoli tipi di PII. Al momento
-        della verifica, il backend interseca la lista di esenzioni
-        attive per l'utente con i \emph{reasons} restituiti da Model
-        Armor: se ogni motivo è coperto da esenzione, la richiesta
-        prosegue.
-  \item \textbf{Sanitizzazione della risposta e audit.} La stessa funzione
-        di sanitizzazione viene applicata all'output del modello prima del
-        salvataggio in conversazione, e ogni interazione è registrata in
-        modo strutturato nella tabella \texttt{chat\_logs} con
-        \emph{action}, modello selezionato, conteggio token in/out e flag
-        di citazioni. Eventi di blocco vengono inoltre registrati su un
-        \emph{security log} dedicato (\texttt{security\_logger.log\_prompt\_blocked},
-        \texttt{log\_response\_blocked}), che alimenta la dashboard di
-        amministrazione descritta in Sez.~\ref{sec:agenti-admin-impl}.
+  \item \textbf{Sanitizzazione del prompt.} Prima dell'invio all'LLM, il testo passa per il template
+        di Google Cloud Model Armor~\cite{gcp_modelarmor}, che combina un classificatore
+        \emph{Responsible AI} (\emph{hate}, \emph{harassment}, \emph{sexually explicit},
+        \emph{dangerous}), il rilevatore di \emph{prompt injection}~\cite{perez2022promptinjection}
+        e la \emph{Sensitive Data Protection}~\cite{gcp_dlp} per le PII, in linea con l'European AI
+        Act~\cite{eu2024aiact}. Le PII del contesto italiano (Codice Fiscale, Partita IVA, IBAN) sono
+        \emph{custom info types}; quando rilevate, il backend non maschera ciecamente il valore ma
+        rifiuta la richiesta invitando a riformulare --- il \emph{tokenizing} cieco produrrebbe
+        risposte inutilizzabili, poiché l'autenticità del dato è spesso necessaria.
+  \item \textbf{Esenzioni per gruppo.} Alcuni gruppi (es. l'ufficio legale) hanno legittimo bisogno
+        di trattare PII specifiche. Le tabelle \texttt{model\_armor\_group\_exemptions} e
+        \texttt{pii\_group\_exemptions} consentono di escludere per gruppo singoli filtri o tipi di
+        PII: alla verifica, il backend interseca le esenzioni attive dell'utente con i \emph{reasons}
+        di Model Armor e, se ogni motivo è coperto, la richiesta prosegue.
+  \item \textbf{Sanitizzazione della risposta e audit.} La stessa sanitizzazione si applica
+        all'output prima del salvataggio, e ogni interazione è registrata in \texttt{chat\_logs}
+        (action, modello, token in/out, flag citazioni). Gli eventi di blocco finiscono inoltre in un
+        \emph{security log} dedicato che alimenta la dashboard di amministrazione
+        (Sez.~\ref{sec:agenti-admin-impl}).
 \end{enumerate}
 
 \begin{figure}[htbp]
@@ -561,19 +515,11 @@ modello in Vera attraversa una catena di controlli predisposta nel servizio
 \FloatBarrier
 
 \paragraph{Ambito di applicazione.}
-La catena di sicurezza descritta è specifica di Vera. L'orchestratore Orion,
-descritto nel Cap.~\ref{chap:orion}, implementa la stessa
-catena; quando i sub-agenti verticali sono invocati attraverso Orion, il
-prompt è già stato sanitizzato dall'orchestratore prima dell'inoltro.
-Gli altri agenti verticali (SysAid, AllyCare, CooPolicy) non implementano una
-propria catena di sicurezza pre/post generazione: quando operano in modalità
-\emph{standalone} (accesso diretto dal portale), funzionano esclusivamente
-sulla rete interna aziendale con accesso autenticato
-(Sez.~\ref{subsec:agenti-auth}) e si affidano ai guardrail integrati nel
-proprio prompt di sistema (le direttive che riflettono l'identità e i
-valori dell'organizzazione, descritte fra i principi guida della
-Sez.~\ref{sec:agenti-principi}) come misura di protezione a livello
-di prompt.
+La catena è specifica di Vera; Orion (Cap.~\ref{chap:orion}) implementa la stessa, sanitizzando il
+prompt prima di inoltrarlo ai sub-agenti. Gli altri agenti (SysAid, AllyCare, CooPolicy) non hanno
+una propria catena pre/post generazione: in modalità \emph{standalone} operano solo sulla rete
+interna con accesso autenticato (Sez.~\ref{subsec:agenti-auth}) e si affidano, come protezione a
+livello di prompt, ai guardrail del proprio prompt di sistema (Sez.~\ref{sec:agenti-principi}).
 
 % =====================================================================
 \section{CooPolicy --- RAG su corpus di policy condiviso}
@@ -589,21 +535,15 @@ recupero e ad ancorare la generazione esclusivamente al materiale recuperato.
 \subsection{Caso d'uso e requisiti}
 \label{subsec:coopolicy-caso-uso}
 
-L'agente è specializzato nella ricerca e nell'interpretazione di documenti normativi interni:
-deve gestire in sostanza tutta la documentazione presente sulla Intranet aziendale,
-che tratta gli argomenti più vari e si è espansa nel corso degli anni, fino a diventare frastagliata
-e spesso di non facile consultazione.
-Le tematiche trattate dai documenti possono comprendere, a titolo di esempio:
-manuali d'uso, procedure, contratti di lavoro, organigrammi, comunicazioni organizzative.
+L'agente è specializzato nella ricerca e interpretazione dei documenti normativi interni: gestisce
+la documentazione della Intranet aziendale --- manuali, procedure, contratti di lavoro, organigrammi,
+comunicazioni --- espansasi negli anni fino a diventare frastagliata e di non facile consultazione.
 
-A differenza di Vera, CooPolicy non deve avere accesso a fonti esterne: vincolo essenziale è che le
-risposte agli utenti siano fornite in maniera precisa e approfondita se il materiale è presente nel
-contesto RAG fornito~\cite{lewis2020rag,guu2020realm}, oppure che non siano fornite affatto.
-Anche in questo caso ogni fonte deve essere correttamente citata e accessibile.
-Devono essere messe in atto tutte le tecniche più adeguate per instradare correttamente le
-richieste degli utenti anche se pervenute in formato molto stringato o interpretabile: a tal fine, il sistema
-classifica ogni query per selezionare il corpus tematico più pertinente e applica una soglia di
-rilevanza permissiva che delega al modello generativo la decisione finale sull'utilità dei chunk recuperati.
+A differenza di Vera, CooPolicy non accede a fonti esterne: le risposte devono essere precise e
+approfondite se il materiale è nel contesto RAG~\cite{lewis2020rag,guu2020realm}, oppure non essere
+fornite affatto, sempre con fonti citate e accessibili. Per instradare anche richieste stringate, il
+sistema classifica ogni query verso il corpus tematico più pertinente e applica una soglia di
+rilevanza permissiva, delegando al modello la decisione finale sull'utilità dei chunk recuperati.
 
 \subsection{Multi-corpus e classificazione della query}
 \label{subsec:coopolicy-multicorpus}
@@ -751,22 +691,16 @@ dati e affida all'\emph{agentic loop} di ADK la gestione del ciclo ReAct
 \subsection{Caso d'uso e requisiti}
 \label{subsec:allycare-caso-uso}
 
-L'agente è specializzato nell'analisi dei dati dei sondaggi NPS (Net Promoter Score) condotti dall'organizzazione.
-La base dati di appoggio è in formato tabellare e sottoposta ad aggiornamento costante:
-nei sondaggi, oltre a chiedere un voto per ognuno dei vari aspetti dell'esperienza di acquisto, viene lasciata la possibilità di compilare
-un campo di testo libero con ciò che l'utente ritiene di segnalare.
-Un flusso LLM dedicato analizza i commenti presenti e li cataloga in base a delle tabelle specifiche (reparto e argomento di riferimento, valutazione del sentiment del commento, e così via)
-e infine compila una tabella ``ai enriched'' che comprende sia tutti i dati di base di ogni singola risposta (voti etc) che i nuovi ``tag'' generati.
+L'agente è specializzato nell'analisi dei sondaggi NPS (Net Promoter Score) dell'organizzazione. La
+base dati tabellare, in aggiornamento costante, raccoglie per ogni sondaggio i voti sui vari aspetti
+dell'esperienza d'acquisto più un campo di testo libero; un flusso LLM dedicato analizza i commenti
+e li cataloga (reparto, argomento, sentiment), producendo una tabella ``ai enriched'' che affianca ai
+dati di base i tag generati.
 
-L'agente AllyCare ha lo scopo di facilitare le analisi su questa tabella:
-deve svolgere sia compiti che tradizionalmente avrebbero richiesto la creazione di reportistica ad hoc
-(risposta a domande quantitative come ``numero di voti positivi per il periodo X, per il negozio Y'', e così via,
-oppure creazione di grafici di andamento nel tempo), sia compiti di analisi qualitativa
-che richiederebbero molto tempo: domande come ``elenca le maggiori criticità nella regione / negozio specifico'' e simili.
-
-La richiesta dell'utente deve quindi essere tradotta dal modello in una (o più) query SQL adeguate,
-che vengono poi eseguite e il cui risultato viene utilizzato
-per fornire la risposta e le successive analisi.
+AllyCare facilita le analisi su questa tabella, coprendo sia compiti da reportistica ad hoc (domande
+quantitative come ``voti positivi nel periodo X per il negozio Y'', grafici di andamento) sia analisi
+qualitative onerose (``elenca le maggiori criticità in una regione/negozio''). La richiesta è tradotta
+dal modello in una o più query SQL, eseguite e usate per la risposta e le analisi successive.
 
 \subsection{Iniezione selettiva dello schema}
 \label{subsec:allycare-schema}
@@ -915,19 +849,13 @@ ospita due code path alimentate da fornitori concorrenti.
 \subsection{Caso d'uso e requisiti}
 \label{subsec:sysaid-caso-uso}
 
-SysAid è l'agente specializzato nell'analisi della base dati di ticketing dell'organizzazione.
-Anche in questo caso, la base dati di appoggio è in formato tabellare: è una copia ``in streaming'' in tempo reale del database effettivo del servizio.
-
-L'agente deve facilitare le analisi su questa base dati, svolgendo anche in questo caso sia compiti che tradizionalmente
-avrebbero richiesto la creazione di reportistica ad hoc
-(numeriche, andamenti, tempi di risoluzione...), sia compiti di analisi qualitativa che richiederebbero molto tempo:
-domande come ``elenca le maggiori criticità nella regione / negozio specifico''.
-Inoltre data la presenza di dati realtime, deve essere in grado di fornire informazioni sullo stato di salute attuale
-dei sistemi informativi così da fornire supporto al troubleshooting.
-Una fascia di utenza ideale, oltre al management, è quella del personale del Service Desk.
-
-Anche in questo caso, la richiesta dell'utente deve quindi essere tradotta dal modello in una (o più) query SQL adeguate,
-che vengono poi eseguite e il cui risultato viene utilizzato per fornire la risposta e le successive analisi.
+SysAid è specializzato nell'analisi della base dati di ticketing dell'organizzazione, una copia
+tabellare in streaming in tempo reale del database del servizio. Come AllyCare, copre sia compiti da
+reportistica ad hoc (numeriche, andamenti, tempi di risoluzione) sia analisi qualitative onerose
+(``maggiori criticità in una regione/negozio''); la disponibilità di dati realtime gli consente
+inoltre di riportare lo stato di salute attuale dei sistemi a supporto del troubleshooting --- utile
+al management e al personale del Service Desk. Anche qui la richiesta è tradotta in query SQL,
+eseguite e usate per la risposta.
 
 \subsection{Pluralità del modello nel routing}
 \label{subsec:agenti-sysaid-confronto}
@@ -1104,18 +1032,10 @@ L'orchestratore è stato quindi introdotto solo a valle della validazione
 dei singoli agenti, ed è oggetto del Capitolo~\ref{chap:orion}.
 
 \paragraph{Fine-tuning o training di un modello proprietario o open source.}
-Un'altra alternativa esplorata nella fase di analisi iniziale è stata quella di
-addestrare
-un modello sui dati interni dell'organizzazione, per creare un LLM
-specializzato sul dominio aziendale.
-Questa opzione è stata scartata
-per tre ragioni. In primo luogo, il costo di addestramento e
-mantenimento di un modello su scala enterprise è proibitivo per
-un'organizzazione che non ha nel proprio core business lo sviluppo
-di modelli AI: non è presente hardware adeguato (il core business della cooperativa è ben diverso)
-e acquisirlo, sia on-premises che cloud, comporterebbe costi non giustificabili.
-In secondo luogo, il fine-tuning non risolve il
-problema fondamentale del knowledge cutoff: un modello addestrato sui
-dati di sei mesi fa non conosce i ticket aperti questa settimana, né
-le policy aggiornate ieri. Il grounding è
-la risposta corretta per i dati che cambiano nel tempo.
+Si è valutato di addestrare un modello sui dati interni per creare un LLM specializzato sul dominio.
+L'opzione è stata scartata per due ragioni. Primo, il costo di addestramento e mantenimento su scala
+enterprise è proibitivo per un'organizzazione il cui core business non è lo sviluppo di modelli AI
+(manca l'hardware adeguato e acquisirlo non sarebbe giustificabile). Secondo, il fine-tuning non
+risolve il \emph{knowledge cutoff}: un modello addestrato sui dati di sei mesi fa non conosce i ticket
+di questa settimana né le policy aggiornate ieri --- per i dati che cambiano nel tempo la risposta
+corretta è il grounding.

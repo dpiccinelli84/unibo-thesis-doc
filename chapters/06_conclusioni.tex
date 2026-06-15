@@ -42,10 +42,12 @@ basata su un gold standard di 120~test case, uno strumento di esecuzione automat
 La metodologia ha consentito di misurare l'effetto di un'iterazione del system prompt del router: 
 agent accuracy stabile al $99{,}2\%$ e complexity accuracy dall'$88{,}3\%$ al $93{,}3\%$ tra le versioni v1.0 e v1.1, sopra i rispettivi target.
 
-A complemento della valutazione del routing, il Capitolo~\ref{chap:orion-valutazione} riporta anche una valutazione quantitativa della qualità dei sub-agenti: 
-execution accuracy dell'$80$--$84\%$ per gli agenti Text-to-SQL e, per il RAG, faithfulness $0{,}73$ con answer rate del $100\%$ sulle domande in corpus (Sez.~\ref{sec:eval-agenti}), 
-e una valutazione economica indicativa (Sez.~\ref{sec:eval-costi}) che dà sostanza alla motivazione di costo: nello scenario illustrativo considerato, 
-una piattaforma a consumo risulta di circa un fattore 40 più economica delle licenze SaaS nominali per l'intera popolazione, 
+A complemento della valutazione del routing, il Capitolo~\ref{chap:orion-valutazione} cataloga le tecniche di \emph{prompt engineering} applicate ai dati aziendali reali dei singoli agenti (Sez.~\ref{sec:eval-prompteng})
+e riporta una valutazione quantitativa della qualità dei sub-agenti:
+execution accuracy dell'$80$--$84\%$ per gli agenti Text-to-SQL e, per il RAG, faithfulness $0{,}73$ con answer rate del $100\%$ sulle domande in corpus (Sez.~\ref{sec:eval-agenti}).
+Analizza inoltre il trade-off costo--qualità realizzato dal routing per complessità (Sez.~\ref{sec:eval-costo-qualita}): ai listini correnti dei modelli, instradare l'$86{,}7\%$ del traffico verso il modello economico riduce il costo dell'inferenza di un fattore $\approx 2{,}9\times$ senza degradare la qualità sulla fascia complessa.
+Una valutazione economica indicativa (Sez.~\ref{sec:eval-costi}) dà infine sostanza alla motivazione di costo: nello scenario illustrativo considerato,
+una piattaforma a consumo risulta di circa un fattore 40 più economica delle licenze SaaS nominali per l'intera popolazione,
 vantaggio che deriva dal modello di tariffazione (uso effettivo contro disponibilità per utente) più che dalla tecnologia.
 
 % =====================================================================

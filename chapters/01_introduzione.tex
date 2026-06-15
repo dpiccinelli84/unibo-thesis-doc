@@ -105,10 +105,13 @@ I contributi specifici sono tre:
   il router instrada quindi tra \texttt{self}, \texttt{sysaid}, \texttt{allycare} e \texttt{coopolicy}. 
   Capitolo~\ref{chap:orion}.
 
-  \item \textbf{Una metodologia di valutazione del routing.} 
+  \item \textbf{Una metodologia di valutazione del routing.}
   Basata su un gold standard configurabile e su un system prompt adattabile
   tramite interfaccia grafica per velocizzare le iterazioni e valutare velocemente
-  le variazioni di performance.
+  le variazioni di performance. La valutazione si estende inoltre alla qualità dei
+  sub-agenti, alla catalogazione delle tecniche di \emph{prompt engineering} applicate
+  ai dati aziendali reali dei singoli agenti e all'analisi quantitativa del trade-off
+  costo--qualità realizzato dal routing per complessità.
   Capitolo~\ref{chap:orion-valutazione}.
 \end{enumerate}
 
@@ -174,10 +177,10 @@ agent proxy, gestione della storia conversazionale,
 frontend con badge trasparente, admin panel,
 infrastruttura e schema del database.
 
-Il \textbf{Capitolo~\ref{chap:orion-valutazione}} presenta la valutazione sperimentale su tre piani: 
-il routing dell'orchestratore (domande di ricerca, gold standard, metriche dichiarate a priori, 
-risultati e iterazione del prompt, analisi degli errori e limiti), 
-la qualità dei sub-agenti (execution accuracy per gli agenti Text-to-SQL e faithfulness per il RAG) 
-e una valutazione economica a ordini di grandezza.
+Il \textbf{Capitolo~\ref{chap:orion-valutazione}} presenta la valutazione sperimentale su più piani:
+il routing dell'orchestratore (domande di ricerca, gold standard, metriche dichiarate a priori,
+anatomia del prompt e tecniche di prompt engineering applicate ai dati aziendali, risultati e iterazione del prompt),
+la qualità dei sub-agenti (execution accuracy per gli agenti Text-to-SQL e faithfulness per il RAG),
+l'ottimizzazione costo--qualità del routing per complessità e una valutazione economica a ordini di grandezza.
 
 Il \textbf{Capitolo~\ref{chap:conclusioni}} sintetizza i contributi, discute la generalizzabilità del pattern e presenta le direzioni di sviluppo futuro.

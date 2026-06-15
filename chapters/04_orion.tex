@@ -387,15 +387,15 @@ Un caso particolarmente significativo è la normalizzazione delle citazioni di C
 originariamente nel formato \texttt{gs://bucket/file.pdf}, vengono riscritti come \texttt{/api/orion/docs/file?uri=...},
 un percorso relativo che il frontend può aprire direttamente e che viene servito da un proxy autenticato verso GCS montato nel backend di Orion.
 
-\paragraph{Gestione degli errori e fallback.} Se il sub-agente risponde con un codice di errore (4xx, 5xx)
-o non risponde entro il timeout di 120~secondi, il proxy restituisce un messaggio di errore leggibile e il flag \texttt{error = true}.
-Il frontend rileva il flag e può mostrare all'utente un messaggio appropriato. In alternativa,
-il flusso può ricadere sulla pipeline interna di Orion (\texttt{agent = "self"}).
+\paragraph{Gestione degli errori e fallback.} Se il sub-agente risponde con un codice di errore (4xx,
+5xx) o supera il timeout di 120~s, il proxy restituisce un messaggio leggibile con il flag
+\texttt{error = true}; il frontend lo intercetta e, in alternativa, il flusso può ricadere sulla
+pipeline interna (\texttt{agent = "self"}).
 
-\paragraph{Streaming bufferizzato.} Il proxy attende la risposta completa del sub-agente
-prima di inoltrarla al frontend via \emph{Server-Sent Events} (SSE).
-La scelta semplifica la normalizzazione al costo di un \emph{time-to-first-token}
-pari alla latenza dell'intero sub-agente; l'evoluzione verso uno streaming \emph{pass-through} è una possibile evolutiva architetturale (Tab.~\ref{tab:orion-decisioni}).
+\paragraph{Streaming bufferizzato.} Il proxy attende la risposta completa del sub-agente prima di
+inoltrarla via SSE: la scelta semplifica la normalizzazione al costo di un \emph{time-to-first-token}
+pari alla latenza dell'intero sub-agente; lo streaming \emph{pass-through} è una possibile evolutiva
+(Tab.~\ref{tab:orion-decisioni}).
 
 \begin{figure}[htbp]
     \centering
@@ -409,16 +409,13 @@ pari alla latenza dell'intero sub-agente; l'evoluzione verso uno streaming \emph
 \label{sec:orion-history}
 % =====================================================================
 
-Orion mantiene una \emph{storia unica} per conversazione: tutti i turni, indipendentemente dall'agente che li ha serviti, sono memorizzati nella stessa conversazione del database di Orion.
-Questa scelta consente all'utente di cambiare argomento (e quindi agente) all'interno
-della stessa conversazione senza discontinuità percepita.
-
-Il trade-off accettato è che il sub-agente invocato riceve l'intera storia della conversazione,
-inclusi i turni gestiti da altri agenti. Per mitigare il rischio di confusione, la storia inviata al sub-agente
-è troncata agli ultimi sei turni (parametro configurabile) e i messaggi non pertinenti (ad esempio, grafici base64 o citazioni di documenti)
-sono sostituiti con un riassunto testuale sintetico. Il router stesso riceve la storia per
-migliorare la classificazione dei turni di follow-up: se l'utente ha appena chiesto informazioni sui ticket IT,
-una domanda successiva come ``E quanti ne sono stati chiusi?'' viene correttamente instradata a SysAid anche in assenza di parole chiave esplicite.
+Orion mantiene una \emph{storia unica} per conversazione: tutti i turni, qualunque agente li abbia
+serviti, risiedono nella stessa conversazione, così che l'utente possa cambiare argomento (e agente)
+senza discontinuità. Il trade-off è che il sub-agente riceve l'intera storia, inclusi i turni di altri
+agenti: per mitigare la confusione la storia è troncata agli ultimi sei turni (configurabile) e i
+contenuti non pertinenti (grafici base64, citazioni) sono sostituiti da un riassunto sintetico. Anche
+il router riceve la storia, così che un follow-up come ``E quanti ne sono stati chiusi?'' venga
+instradato a SysAid pur senza parole chiave esplicite.
 
 % =====================================================================
 \section{Integrazione nel flusso di chat e sicurezza}

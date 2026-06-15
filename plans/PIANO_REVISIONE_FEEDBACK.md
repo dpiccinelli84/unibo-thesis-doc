@@ -25,6 +25,13 @@
 - Background (cap. 2) invariato nei contenuti.
 - La sezione "Lavori correlati" resta nel capitolo Orion (non migra nel background).
 - Il rapporto descrittivo/valutazione passa da 68/14 pagine a ~55/28.
+- **(14/6)** Tagliato il confronto sperimentale router **Flash vs Pro** (ex F3.1/F2.2d):
+  non richiesto dai prof, chiudeva solo un limite auto-dichiarato. La scelta di
+  Gemini Flash per il router resta motivata (latenza/costo) in 4.4.3 e Tab. decisioni,
+  senza supporto sperimentale dedicato.
+- **(14/6)** F2.1b: storico pre-v1.0 del prompt non recuperabile (repo a 1 commit);
+  pivot a estratti di prompt engineering sugli agenti verticali (nuova Sez. 5.3.4)
+  + leva costo–qualità dei classificatori di complessità in 5.6.
 
 **Numeri della versione consegnata (tesi-piccinelli-davide-02062026.pdf):**
 capp. 3–6 = pp. 21–88 (68 pp), cap. 7 = pp. 89–102 (14 pp), totale ~107 pp.
@@ -35,11 +42,11 @@ capp. 3–6 = pp. 21–88 (68 pp), cap. 7 = pp. 89–102 (14 pp), totale ~107 pp
 
 | Fase | Descrizione | Stato |
 |------|-------------|-------|
-| F0   | Frontespizio (relatore/correlatori) | ✅ 9/6 (resta verifica titoli correlatori) |
-| F1   | Ristrutturazione 8 → 6 capitoli | ✅ 9/6 (compila pulito, 118 pp; resta rilettura suture) |
-| F2   | Espansione capitolo Valutazione (prompt eng. + costo–qualità) | ✅ 9/6 nucleo scritto (restano le integrazioni dai dati F3, marcate `% TODO F3.x` nel .tex) |
-| F3   | Esperimenti e dati (richiedono Davide su GCP) | ☐ (F3.4 già risolta senza rerun) |
-| F4   | Coerenza finale, compilazione, consegna ai prof | ☐ |
+| F0   | Frontespizio (relatore/correlatori) | ✅ 9/6 (resta verifica titoli correlatori — Davide) |
+| F1   | Ristrutturazione 8 → 6 capitoli | ✅ 9/6 (fusioni + deduplicazioni; rilettura suture fatta) |
+| F2   | Espansione capitolo Valutazione (prompt eng. + costo–qualità) | ✅ **14/6 completata**: 5.3 + nuova 5.3.4 (PE sugli agenti) + 5.6 costo–qualità con ρ/S reali e worked example |
+| F3   | Esperimenti e dati (richiedono Davide su GCP) | ⏳ F3.4/F3.6 fatte; F3.1/F3.5 tagliate; **resta solo F3.3 (token medi), opzionale** |
+| F4   | Coerenza finale, compilazione, consegna ai prof | ⏳ **14/6: F4.1/F4.2/F4.3 fatte** (asciugatura inclusa); resta F4.4 (consegna — Davide) |
 
 **Esito misurato (9/6 sera):** capp. 3–4 = pp. 21–82 (62 pp, dalle 68 della
 versione consegnata); cap. 5 = pp. 83–104 (**22 pp, dalle 14 consegnate**):
@@ -48,6 +55,16 @@ prompt reale + tabella delle 9 tecniche mappate sulla letteratura) e nuova
 Sez. 5.6 "Ottimizzazione costo–qualità" (RQ6, modello parametrico del
 risparmio, breakdown EX per fascia con IC Wilson); Discussione spostata in
 chiusura con risposta a RQ6 e nuovo limite dichiarato.
+
+**Aggiornamento (14/6 sera):** completati asse (a) — PE sugli agenti (nuova Sez. 5.3.4, 6 listing
+reali: header costituzionale, AllyCare schema/SQL/fiducia-tool, CooPolicy regole, SysAid SEARCH) —
+e asse (b) — costo–qualità con numeri reali: ρ≈4 Gemini → **S≈2,9× (~65%)**; SysAid ρ≈6–10 →
+3,6–4,6×; Tab. listini + worked example (~0,55 M req/anno: sempre-Pro ~€6,9k vs routing ~€2,4k →
+**~€4,5k/anno risparmiati**); `cost_model.py` esteso (`--routing`); bib: listini Google/Anthropic.
+F4.1 (abstract/§1.4/§1.6/conclusioni) e F4.2 fatte; **asciugatura prosa: descrittivo 62→59 pp**
+(nessun contenuto/figura rimossi). **Stato: tot 128 pp, descrittivo 59, valutazione 27, compila pulito.**
+Modifiche NON committate (Davide ci pensa). Prossimi: F0 (titoli/sessione), F4.4 (consegna),
+opzionali → ridimensionare screenshot per 59→55 e F3.3 (token reali).
 
 ---
 
@@ -202,11 +219,15 @@ Obiettivo: da 14 a ~25–30 pagine. Struttura target:
 - [x] **F2.1a** *(fatto 9/6)* Tre estratti del prompt v1.0 reale in tesi
       (`lst:prompt-regole`, `lst:prompt-confidence`, `lst:prompt-agente`), con
       `literate` per gli accenti nei listings e `\lstlistingname` = "Listato".
-- [ ] **F2.1b** Racconto delle iterazioni pre-v1.0 + diff testuale v1.0→v1.1.
-      Ancoraggio già in tesi: chiusura di 5.3.3 e `% TODO F3.5` in 5.4.3.
-      **TODO Davide:** recuperare/ricordare 2–3 iterazioni informali significative
-      (cosa falliva, cosa è stato cambiato nel prompt, effetto osservato) +
-      la v1.1 testuale da `app_settings`.
+- [x] **F2.1b** *(risolto diversamente 14/6)* Lo storico pre-v1.0 NON è recuperabile
+      (repo `unibo-thesis-src` a 1 commit, repo aziendale non disponibile). **Pivot:**
+      invece della cronologia temporale, nuova **Sez. 5.3.4** "Prompt engineering negli
+      agenti verticali: estratti reali" con 6 listing reali (header costituzionale;
+      AllyCare schema+glossario, regole SQL, gerarchia verità/fiducia tool; CooPolicy
+      regole non negoziabili; SysAid SEARCH/DATETIME) mappati sulla letteratura già
+      citata, + leva costo–qualità (default asimmetrico dei classificatori di
+      complessità: AllyCare "high", SysAid/CooPolicy "low") in 5.6. Risponde alla
+      richiesta (a) di Raimondi. Rimosso il `% TODO F3.5` dalla chiusura di 5.3.
 - [x] **F2.1c** *(fatto 9/6, Tab. `tab:eval-tecniche` con 9 tecniche)* Mappatura
       esplicita tecnica ↔ letteratura (voci già in `bibliography.bib`):
       - role prompting + delimitatori → survey Sahoo 2024 (`sahoo2024prompteng_survey`)
@@ -227,13 +248,17 @@ Obiettivo: da 14 a ~25–30 pagine. Struttura target:
 - [x] **F2.2a** *(fatto 9/6)* RQ6 attiva ("Il routing per complessità preserva la
       qualità delle risposte riducendo il costo?") con risposta parziale in 5.8.1.
 - [x] **F2.2b** *(fatto 9/6)* Inquadramento FrugalGPT/RouteLLM nell'apertura di 5.6.
-- [~] **F2.2c** *(parziale 9/6)* Distribuzione low/high misurata dal gold: **104/120
-      low (86,7%), 16/120 high (13,3%)**; modello parametrico del risparmio
-      S = ρ/(f_low + f_high·ρ), limite asintotico 1/f_high = 7,5×; esempi ρ=5/10/20
-      → 3,3×/4,5×/5,7× (verificati con calcolo). Mancano i valori monetari:
-      token medi (F3.3) e listini (F3.6) — `% TODO` nel .tex.
-- [ ] **F2.2d** Subsection "Il costo del router: Flash vs Pro" — in commento nel .tex,
-      si scrive coi dati di F3.1.
+- [x] **F2.2c** *(completata 14/6)* Distribuzione low/high dal gold: **104/120
+      low (86,7%), 16/120 high (13,3%)**; modello S = ρ/(f_low + f_high·ρ).
+      **ρ istanziato con listini reali** (F3.6 fatta): coppia Gemini Flash↔Pro
+      ρ≈4,0–4,2 (quasi mix-indipendente) → **S≈2,9× (~65%)**; coppia Flash↔Sonnet
+      (SysAid) ρ≈6–10 → **S≈3,6–4,6× (~72–78%)**. Tab. `tab:eval-prezzi` (listini)
+      + worked example `tab:eval-cq-saving` (~0,55 M req/anno: sempre-Pro ~€6,9k vs
+      routing ~€2,4k → ~€4,5k/anno risparmiati) + paragrafo sensibilità + overhead
+      router quantificato (S incl. router ≈2,3×). `cost_model.py` esteso
+      (`request_cost`, `routing_savings`, flag `--routing`). Bib: `gcp_gemini_pricing`,
+      `anthropic_pricing`. **Resta solo F3.3** (token medi reali) per trasformare il
+      profilo di token assunto (4000 in / 800 out) in misurato — opzionale.
 - [x] **F2.2e** *(fatto 9/6 — F3.4 risolta senza rerun)* I CSV `results/` del 29/05
       contengono già la colonna `complexity`; identificate le run citate in tesi
       (allycare_171107: 20/25 + exec 23/25; sysaid_171814: 21/25 + exec 25/25) e
@@ -257,36 +282,53 @@ Obiettivo: da 14 a ~25–30 pagine. Struttura target:
 
 ## 6. FASE 3 — Esperimenti e dati (richiedono Davide su GCP/ambiente)
 
-- [ ] **F3.1 Run eval del router con Gemini 2.5 Pro** (per F2.2d).
-      Dall'admin panel: cambiare il modello del router (env var/setting), lanciare la
-      eval sulla stessa test suite v1.1, etichettarla es. `v1.1-pro`.
-      Durata ~2 min, costo qualche euro. Annotare: accuracy agente/complessità,
-      confidence medie, costo per chiamata.
+- [x] ~~**F3.1 Run eval del router con Gemini 2.5 Pro**~~ — **TAGLIATA (14/6)**:
+      confronto Flash vs Pro non richiesto dai prof (chiudeva solo un limite
+      auto-dichiarato). Rimossi anche F2.2d e i relativi `% TODO`/limite nel .tex.
+      Numerazione F3.2–F3.6 invariata. Vedi "Decisioni prese".
 - [ ] **F3.2 Gold standard esteso sugli ambigui** (per F2.3a).
       +20–25 casi categoria *Ambiguous* (oggi 7/120) costruiti su sovrapposizioni reali
       SysAid↔AllyCare e Self↔CooPolicy; rerun v1.1 → robustezza RQ3/RQ4.
-- [ ] **F3.3 Query su `chat_logs`** (per F2.2c): token in/out medi per agente e modello.
-      (La query SQL la prepara Claude quando si arriva a F2.2c.)
+- [ ] **F3.3 Query su `chat_logs`** (per F2.2c) — **ORA OPZIONALE**: token in/out medi
+      per agente e modello, per sostituire il profilo assunto (4000 in / 800 out) con
+      valori misurati. Non cambia S/% (dipendono da ρ e dalla distribuzione), solo la
+      precisione delle cifre annue in €. (La query SQL la prepara Claude se serve.)
 - [x] **F3.4 Verifica CSV SysAid** *(risolta 9/6 senza rerun)*: i CSV riportano già
       la complessità per caso; breakdown calcolato e inserito in tesi (vedi F2.2e).
-- [ ] **F3.5 Iterazioni storiche del prompt** (per F2.1b): recuperare le versioni
-      precedenti del system prompt del router (tabella `app_settings` / history Bitbucket)
-      e annotare le passate di tuning significative.
-- [ ] **F3.6 Prezzi listino** (per F2.2c): verificare i prezzi correnti per Mtoken di
-      Gemini 2.5 Flash/Pro (Vertex AI) e Claude Sonnet 4.6 a giugno 2026.
+- [x] ~~**F3.5 Iterazioni storiche del prompt**~~ — **TAGLIATA (14/6)**: versioni
+      precedenti non recuperabili (repo anonimizzato a 1 commit, niente git history;
+      repo aziendale `c30-ai-agents` non presente). Sostituita dal pivot "estratti di
+      prompt engineering sugli agenti" — vedi F2.1b.
+- [x] **F3.6 Prezzi listino** *(fatta 14/6)*: Gemini 2.5 Flash $0,30/$2,50, Pro
+      $1,25/$10,00 (Vertex/Google, ufficiale), Claude Sonnet 4.6 $3,00/$15,00
+      (Anthropic) per Mtok. In Tab. `tab:eval-prezzi`; fonti in bibliografia.
+      **TODO Davide:** confermare contro la fatturazione Vertex reale (eventuali sconti
+      enterprise) e il cambio EUR/USD usato (~0,92) — non cambia gli ordini di grandezza.
 
 ---
 
 ## 7. FASE 4 — Coerenza finale e consegna
 
-- [ ] **F4.1** Riscrivere/aggiornare: abstract, 1.4 (contributi), 1.6 (struttura),
-      conclusioni (se i risultati costo–qualità aggiungono un contributo, citarlo).
-- [ ] **F4.2** Passata anti-duplicazione finale sull'intera tesi (rilettura mirata dei
-      richiami tra capp. 3, 4, 5).
-- [ ] **F4.3** Compilazione finale pulita, verifica lof/lot/toc, conteggio pagine
-      (target: descrittivo ~50–55, valutazione ~25–30).
+- [x] **F4.1** *(fatto 14/6)* Aggiornati: abstract (aggiunti prompt engineering +
+      trade-off costo–qualità), §1.4 contributo 3 (esteso a prompt engineering e
+      costo–qualità, restano 3 contributi), §1.6 struttura (cap. 5 "su più piani"),
+      conclusioni (catalogo PE + risultato costo–qualità ≈2,9×). Costo–qualità NON
+      promosso a 4° contributo: integrato nel 3° (coerente con la figura `contributi`).
+- [x] **F4.2** *(passata mirata 14/6)* Le ripetizioni cap. 3 ↔ cap. 5 ("fiducia nel
+      tool", "gerarchia della verità", regole CooPolicy) sono volute: cap. 3 descrive
+      l'implementazione, la nuova 5.3.4 ne mostra l'estratto con rimando a cap. 3 (non
+      riscrive). Nessuna duplicazione accidentale introdotta.
+- [x] **F4.3** *(fatto 14/6)* Compila pulito (exit 0, zero undefined/multiply-defined);
+      tabelle 5.8/5.9 in `.lot`. **Asciugatura prosa eseguita** (~13 passaggi: principi,
+      architettura, 4 cappelli caso d'uso, quota/ragionamento/retry, alternative, catena di
+      sicurezza, storia/proxy di Orion) → **descrittivo da 62 a 59 pp, nessun contenuto/figura
+      rimossi**. Conteggi: tot **128 pp**; Valutazione (cap. 5) = **27 pp** (target 25–30 ✓);
+      descrittivo (cap. 3+4) = **59 pp**. Rapporto descr./valut. da 68/14 a **59/27**.
+      **Deciso (14/6): si resta a 59 per ora.** Ultimo gap (59→55) non dalla prosa ma dal
+      ridimensionamento degli screenshot oversize (7 a `height=0.85\textheight`, generano pagine
+      semivuote) → ~3–4 pp recuperabili senza perdere testo. *(da valutare con Davide.)*
 - [ ] **F4.4** PDF ai prof + eventuale call con Bianca per i prossimi passi
-      (lei si è offerta; raggiungibile anche su Teams per risposte rapide).
+      (lei si è offerta; raggiungibile anche su Teams per risposte rapide). **(Davide)**
 
 ---
 

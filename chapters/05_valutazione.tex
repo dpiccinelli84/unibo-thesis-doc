@@ -1,8 +1,6 @@
 % !TEX root = ../main.tex
 % =====================================================================
 % CAPITOLO 5 — VALUTAZIONE SPERIMENTALE
-% (ex capitolo 7; in espansione su richiesta dei relatori — vedi
-%  plans/PIANO_REVISIONE_FEEDBACK.md, attività F2)
 % =====================================================================
 
 \chapter{Valutazione sperimentale}
@@ -71,7 +69,7 @@ La costruzione è avvenuta in tre fasi:
 Le categorie tematiche sono cinque: \emph{SysAid} (36~casi), \emph{NPS} (21~casi), \emph{Policy} (33~casi), \emph{General} (23~casi) e \emph{Ambiguous} (7~casi).
 La distribuzione riflette approssimativamente il volume di traffico atteso, con un \emph{oversampling} deliberato della categoria \emph{Ambiguous} per testare il meccanismo di clarification.
 
-I test case sono raccolti in un file CSV (\texttt{test\_suite\_orion.csv}) e importati nel database dell'admin panel attraverso la pagina \emph{Eval Routing} (Sez.~\ref{subsec:eval-admin-page}).
+I test case sono raccolti in un file CSV (\texttt{test\_suite\_orion.csv}) e importati nel database dell'admin panel attraverso la pagina \emph{Eval Routing} (Sez.~\ref{subsec:eval-admin-page}); la Fig.~\ref{fig:test_suite} ne mostra un estratto nell'apposito tab.
 
 \begin{figure}[htbp]
     \centering
@@ -411,10 +409,7 @@ dall'agente (Sez.~\ref{subsec:eval-text2sql}).
 La difesa anti-allucinazione più incisiva impone che il dato del
 database prevalga sempre sulla stima del modello
 (Listato~\ref{lst:pe-allycare-trust}). La regola di ``fiducia nel tool''
---- riportare il numero restituito dall'ultima query, non quello
-ricordato da un turno precedente --- ha eliminato in fase di test una
-classe di errori di ricalcolo (Sez.~\ref{subsec:allycare-discipline}),
-ed è una contromisura diretta al fenomeno
+è una contromisura diretta al fenomeno
 dell'allucinazione~\cite{xu2024hallucination}.
 
 \begin{lstlisting}[caption={AllyCare: gerarchia della verità e ``fiducia nel tool'' (estratto).},label={lst:pe-allycare-trust}]
@@ -506,7 +501,7 @@ La prima run di valutazione (prompt version v1.0) ha prodotto i seguenti risulta
   \end{tabular}
 \end{table}
 
-L'accuracy globale supera il target del $85\%$ fin dalla prima iterazione. Di seguito il breakdown per agente (Tab.~\ref{tab:eval-v10-breakdown}):
+L'accuracy globale supera il target del $85\%$ fin dalla prima iterazione; la Fig.~\ref{fig:accuracy_per_agent} mostra le KPI card della run v1.0 nell'admin panel. Di seguito il breakdown per agente (Tab.~\ref{tab:eval-v10-breakdown}):
 
 \begin{table}[htbp]
   \centering
@@ -584,7 +579,8 @@ La run v1.1 è stata eseguita sullo \emph{stesso} gold standard della v1.0 modif
 \end{table}
 
 Il guadagno più netto è sulla \emph{complexity accuracy} ($+5{,}0$~punti percentuali): le regole aggiunte hanno reso più stabile la distinzione low/high. 
-L'\emph{agent accuracy} invece non migliora: la Regola~8 non è bastata a correggere la correlazione cross-dataset dell'errore, che ricompare a bassa confidence. 
+L'\emph{agent accuracy} invece non migliora: la Regola~8 non è bastata a correggere la correlazione cross-dataset dell'errore, che ricompare a bassa confidence.
+La Fig.~\ref{fig:eval_v11} riporta i risultati della v1.1 nell'admin panel, con lo storico delle due run sul medesimo gold standard.
 
 
 \begin{figure}[htbp]
@@ -665,6 +661,7 @@ la \textbf{faithfulness} (frazione delle affermazioni della risposta supportate 
 (pertinenza della risposta alla domanda). Il gold standard distingue domande \emph{nel} corpus, su cui si misurano le due metriche e l'\emph{answer rate}, 
 da domande \emph{fuori} corpus, su cui si misura il \emph{tasso di corretto rifiuto}: per un agente vincolato al solo materiale recuperato (Sez.~\ref{subsec:coopolicy-generation}), 
 rifiutare correttamente una domanda fuori dominio è esso stesso un comportamento desiderato.
+I risultati sono riportati nella Tab.~\ref{tab:eval-rag}.
 
 \begin{table}[htbp]
   \centering

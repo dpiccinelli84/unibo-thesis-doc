@@ -1,9 +1,6 @@
 % !TEX root = ../main.tex
 % =====================================================================
 % CAPITOLO 4 — ORION: L'ORCHESTRATORE
-% (fusione dei precedenti capitoli "architettura" e "implementazione",
-%  revisione giugno 2026 su indicazione dei relatori — vedi
-%  plans/PIANO_REVISIONE_FEEDBACK.md, attività F1)
 % =====================================================================
 
 \chapter{Orion: l'orchestratore}
@@ -87,7 +84,8 @@ preceduti dal posizionamento rispetto ai sistemi affini (Sez.~\ref{sec:orion-rel
 \end{figure}
 
 Sul piano organizzativo, l'introduzione dell'orchestratore completa il
-disegno obiettivo del progetto: ai repository della suite
+disegno obiettivo del progetto, mostrato nella sua forma finale in
+Fig.~\ref{fig:architettura_orion_v2}: ai repository della suite
 (Fig.~\ref{fig:multirepo_tree}) si aggiungono quattro nuovi servizi dedicati
 --- \texttt{orion-backend}, \texttt{orion-frontend},
 \texttt{orion-admin-backend} e \texttt{orion-admin-frontend} --- ciascuno
@@ -135,13 +133,11 @@ La Tab.~\ref{tab:orion-related} riassume il confronto lungo cinque dimensioni.
 \end{table}
 
 \paragraph{Orion vs FrugalGPT.} FrugalGPT~\cite{chen2023frugalgpt}
-formalizza il routing come un \emph{cascade}: i modelli sono ordinati per costo crescente
-e la richiesta scala al modello successivo solo se il precedente non è abbastanza sicuro.
+formalizza il routing come un \emph{cascade} sequenziale (Sez.~\ref{sec:bg-routing}).
 Orion non è un cascade ma un \emph{router diretto}: il routing step seleziona un singolo agente in un solo passo, senza prove sequenziali.
 Il vantaggio è una latenza prevedibile e indipendente dal numero di agenti; lo svantaggio è che la decisione è irreversibile nel turno.
 
-\paragraph{Orion vs RouteLLM.} RouteLLM~\cite{ong2024routellm} addestra un classificatore su dati
-di preferenza umana per decidere tra un modello forte e uno debole.
+\paragraph{Orion vs RouteLLM.} RouteLLM~\cite{ong2024routellm}, con il suo router appreso (Sez.~\ref{sec:bg-routing}), decide tra un modello forte e uno debole.
 Orion affronta un problema più ampio (selezione tra $K$~agenti eterogenei,
 non tra due modelli) e adotta un router LLM-based anziché appreso. Il trade-off è esplicito:
 flessibilità (aggiungere un agente richiede l'aggiornamento del prompt, non il riaddestramento)
@@ -241,7 +237,7 @@ Ogni campo assolve a una funzione precisa:
 \label{subsec:orion-confidence}
 
 La \emph{confidence} prodotta dal router governa il comportamento del
-sistema secondo una logica a soglia configurabile.
+sistema secondo una logica a soglia configurabile (Fig.~\ref{fig:routing_decision}).
 La soglia di default, \texttt{ROUTER\_CONFIDENCE\_THRESHOLD}, è impostata a 0,60 (modificabile):
 
 \begin{itemize}
@@ -249,11 +245,9 @@ La soglia di default, \texttt{ROUTER\_CONFIDENCE\_THRESHOLD}, è impostata a 0,6
   \item Se $\text{confidence} < \text{threshold}$, il routing è sospeso. Se il modello ha già proposto una domanda di chiarimento (\texttt{clarification\_needed} non nullo), essa viene restituita all'utente. In caso contrario, il sistema genera automaticamente una richiesta di disambiguazione generica.
 \end{itemize}
 
-La calibrazione del confidence score, la proprietà per cui il modello è
-più incerto quando sbaglia e più sicuro quando ha ragione, non è banale;
-la letteratura mostra che i modelli di grande scala sono ``ragionevolmente'' calibrati quando interrogati
-esplicitamente sulla propria certezza~\cite{kadavath2022knowsknows}, ma la calibrazione peggiora su domini
-specifici non visti in addestramento. Il Capitolo~\ref{chap:orion-valutazione} verifica empiricamente questa proprietà sul dominio del progetto.
+La calibrazione del confidence score --- la proprietà per cui il modello è
+più incerto quando sbaglia e più sicuro quando ha ragione (Sez.~\ref{sec:bg-confidence}) --- non è
+banale e peggiora proprio sui domini specifici non visti in addestramento. Il Capitolo~\ref{chap:orion-valutazione} ne verifica empiricamente la tenuta sul dominio del progetto.
 
 \begin{figure}[htbp]
     \centering
@@ -343,7 +337,7 @@ ogni agente ha il proprio formato di risposta (SysAid include query SQL e grafic
 e il proxy li mappa verso una \emph{shape} uniforme.
 
 Il modulo \texttt{agent\_proxy.py} implementa questa logica nella funzione
-\texttt{forward}. La tabella degli endpoint è configurata tramite variabili
+\texttt{forward}. La tabella degli endpoint (Tab.~\ref{tab:agent-endpoints}) è configurata tramite variabili
 d'ambiente, una per ciascun sub-agente:
 
 \begin{table}[htbp]
@@ -396,6 +390,8 @@ pipeline interna (\texttt{agent = "self"}).
 inoltrarla via SSE: la scelta semplifica la normalizzazione al costo di un \emph{time-to-first-token}
 pari alla latenza dell'intero sub-agente; lo streaming \emph{pass-through} è una possibile evolutiva
 (Tab.~\ref{tab:orion-decisioni}).
+
+La Fig.~\ref{fig:orion_sequence} ricostruisce l'intero turno come sequence diagram, dalla richiesta utente al routing fino all'invocazione del sub-agente e alla normalizzazione della risposta.
 
 \begin{figure}[htbp]
     \centering
@@ -474,6 +470,8 @@ Il badge è un componente React che riceve i campi \texttt{agent\_used} e \textt
 dall'oggetto \texttt{OrionProxyResponse}. La scelta di rendere visibile il routing è motivata da due ragioni: il valore dimostrativo nel contesto della tesi,
 e la fiducia dell'utente nel sistema (l'utente vede che la risposta proviene da un agente specializzato).
 
+La Fig.~\ref{fig:orion_switch} mostra il badge in azione: in un'unica conversazione due richieste consecutive sono instradate ad AllyCare e a SysAid, senza che l'utente debba cambiare strumento.
+
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=0.7\textwidth,height=0.9\textheight,keepaspectratio]{routing1}
@@ -504,6 +502,8 @@ alla \emph{shape} della risposta in base al campo \texttt{agent\_used}:
   Le tabelle Markdown eventualmente presenti nella risposta sono renderizzate con \texttt{remark-gfm}.
   \item \textbf{Self (Orion):} la risposta segue il formato di Vera, con citazioni web inline e supporto a documenti caricati.
 \end{itemize}
+
+La Fig.~\ref{fig:orion_coopolicy} mostra una richiesta su una policy aziendale instradata a CooPolicy attraverso Orion: le citazioni numerate ai documenti sorgente sono preservate dal proxy e rese cliccabili dal frontend.
 
 \begin{figure}[htbp]
   \centering
@@ -565,7 +565,7 @@ sono iniettate da Terraform attraverso il file \texttt{tfvars} dell'ambiente cor
 degli altri servizi della suite (Sez.~\ref{subsec:agenti-iac}).
 
 Il database di Orion è ospitato sulla stessa istanza Cloud SQL della suite (database \texttt{ai\_agents\_db}),
-con tabelle distinte identificate dal prefisso \texttt{orion\_}. Le tabelle principali sono:
+con tabelle distinte identificate dal prefisso \texttt{orion\_}; lo schema relazionale completo è riportato in Fig.~\ref{fig:orion_er}. Le tabelle principali sono:
 
 \begin{itemize}
   \item \texttt{orion\_users}, \texttt{orion\_conversations}, \texttt{orion\_messages}: ereditate dalla struttura di Vera, gestiscono utenti, conversazioni e messaggi.

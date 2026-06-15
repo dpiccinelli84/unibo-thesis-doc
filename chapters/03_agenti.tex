@@ -1,9 +1,6 @@
 % !TEX root = ../main.tex
 % =====================================================================
 % CAPITOLO 3 — LA SUITE DI AGENTI VERTICALI
-% (fusione dei precedenti capitoli "architettura" e "implementazione",
-%  revisione giugno 2026 su indicazione dei relatori — vedi
-%  plans/PIANO_REVISIONE_FEEDBACK.md, attività F1)
 % =====================================================================
 
 \chapter{La suite di agenti verticali}
@@ -11,16 +8,14 @@
 
 Questo capitolo descrive la prima fase del progetto: la progettazione e la
 realizzazione della suite di agenti verticali. Il percorso segue l'ordine
-delle decisioni effettivamente prese: dapprima i principi guida che hanno
+delle decisioni effettivamente prese: per primi i principi guida che hanno
 condizionato ogni scelta successiva e l'architettura d'insieme che ne
-discende; quindi le fondazioni trasversali comuni a tutti i servizi (stack
+deriva; quindi le fondazioni trasversali comuni a tutti i servizi (stack
 tecnologico, organizzazione del codice, infrastruttura come codice, identità
-e sicurezza); infine ciascuno dei quattro agenti, presentato una sola volta
-dal caso d'uso fino ai dettagli realizzativi. Chiudono il capitolo il
+e sicurezza) e infine il dettaglio di ciascuno dei quattro agenti. 
+Chiudono il capitolo il
 pannello di amministrazione e le alternative progettuali considerate e
-scartate. L'orchestratore Orion, che completa l'ecosistema instradando
-automaticamente le richieste verso gli agenti qui descritti, è oggetto del
-Capitolo~\ref{chap:orion}.
+scartate.
 
 % =====================================================================
 \section{Principi guida}
@@ -28,32 +23,34 @@ Capitolo~\ref{chap:orion}.
 % =====================================================================
 \label{subsec:agenti-principi-guida}
 
-La progettazione è stata guidata da una serie di principi fondamentali trasversali,
-stabiliti prima di avviare lo sviluppo e mantenuti durante tutte le fasi successive.
+La progettazione è stata guidata da una serie di fondamenti trasversali,
+stabiliti prima di avviare lo sviluppo e mantenuti durante le fasi successive.
 
 \begin{description}
 
   \item[Rispetto dei principi etici e cooperativi]
     Gli agenti LLM sono intrinsecamente portati a esprimere bias (Sez.~\ref{sec:bg-llm}).
-    Offrire un pacchetto di assistenti interni mitiga questo rischio e previene insieme il
-    ricorso a strumenti AI esterni non autorizzati (\emph{Shadow AI}), riducendo i rischi per
-    la sicurezza del dato. I prompt di sistema, stabiliti collegialmente fra gli uffici interni,
-    integrano direttive esplicite che allineano ogni agente all'identità e ai valori
-    dell'organizzazione, in conformità con i requisiti di trasparenza e \emph{human oversight}
+    Sviluppando agenti interni, il  "comportamento" (definito da guardrail 
+    e prompt di sistema) si può definite collegialmente fra gli uffici interni (Etica, Sicurezza IT),
+    integrando direttive esplicite che allineano ogni agente all'identità e ai valori
+    della cooperativa e in conformità con i requisiti di trasparenza e \emph{human oversight}
     dell'European AI Act~\cite{eu2024aiact}, con cicli di aggiornamento rapidi e controllati.
+    Inoltre, offrire un pacchetto di assistenti interni mitiga questo previene il
+    ricorso incontrollato a strumenti AI esterni non autorizzati (\emph{Shadow AI}), riducendo i rischi per
+    la sicurezza del dato.
 
   \item[Governance facilitata e efficace]
-    Le configurazioni del prompt di sistema (la ``personalità'' dell'agente) e dei controlli su
-    utilizzi impropri e dati personali devono essere gestibili da una dashboard apposita, usabile
-    anche dagli uffici preposti privi di competenza tecnica, che consenta inoltre di monitorare
-    --- nel rispetto della privacy --- gli eventi segnalati come ``pericolosi''. Tutto il codice
-    sorgente risiede nel repository Git dell'organizzazione ed è proprietà della Cooperativa.
+    Le configurazioni del prompt di sistema (la ``personalità'' dell'agente) e i controlli su
+    utilizzi impropri o sensibili devono essere configurabili da una dashboard apposita, 
+    usabile anche dagli uffici preposti privi di competenza tecnica, che consenta inoltre di monitorare
+    gli eventi segnalati come ``pericolosi''. Tutto il codice sorgente risiede nel repository 
+    Git della Cooperativa ed è di sua proprietà.
 
   \item[Implementazione agnostica e sostenibile]
-    Le soluzioni AI ``out of the box'' dei fornitori comportano spesso \emph{vendor lock-in}
+    Le soluzioni AI ``out of the box'' dei fornitori commerciali comportano spesso \emph{vendor lock-in}
     (difficile portabilità verso altre infrastrutture) e costi fissi di sottoscrizione anche con
-    utilizzo scarso. La soluzione realizzata deve invece essere portabile verso qualunque
-    architettura e consentire un controllo dinamico dei costi: un budget di utilizzo (``token'')
+    utilizzo scarso. La soluzione realizzata vuole invece essere portabile verso qualunque
+    architettura o fornitore di LLM e consentire un controllo dinamico dei costi: un budget di utilizzo (``token'')
     per utente, definito dagli amministratori e modificabile alla bisogna, e ovunque possibile un
     \emph{routing} che indirizzi le richieste a bassa complessità verso modelli più economici.
 
@@ -69,7 +66,8 @@ stabiliti prima di avviare lo sviluppo e mantenuti durante tutte le fasi success
     scalare ogni servizio in modo indipendente.
 
   \item[Automazione dei rilasci]
-    Le evolutive devono potere essere rilasciate in maniera trasparente verso l'utente senza causare disservizio,
+    Le evolutive o correzioni di bug devono potere essere rilasciate in maniera trasparente verso l'utente 
+    senza causare disservizio,
     in maniera automatizzata per ridurre al minimo la possibilità di errore umano,
     e con uno step approvativo per il passaggio in produzione.
 
@@ -87,21 +85,20 @@ stabiliti prima di avviare lo sviluppo e mantenuti durante tutte le fasi success
 \label{subsec:agenti-architettura-insieme}
 % =====================================================================
 
-L'ecosistema è accessibile da un unico ``portale'', conseguenza diretta della modularità
-verticale: i nuovi agenti si innestano nel \emph{framework} esistente e le dashboard di
-configurazione (``admin panel'') sono radunate in un portale dedicato.
+L'ecosistema è accessibile da un unico ``portale'', per consentire modularità: 
+eventuali nuovi agenti si innestano nel \emph{framework} esistente, così
+che l'utente finale possa accedervi in maniera pratica e intuitiva.
 
 Pur restando centrale il principio di agnosticità e portabilità, tutte le implementazioni usano
 la piattaforma Cloud di Google~\cite{gcp_vertexai,gcp_cloudrun}, al momento l'unico fornitore
-cloud attivo in Coop Alleanza (le risorse on-premises non consentono una realizzazione
-performante e sostenibile di progetti di AI generativa).
+attivo in Coop Alleanza e adeguato alle necessità.
 
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=0.9\textwidth]{fig1}
   \caption[Architettura d'insieme della suite di agenti]{Architettura
     della suite di agenti verticali: portal con autenticazione federata,
-    quattro servizi di calcolo serverless indipendenti e infrastruttura
+    istanze serverless indipendenti e infrastruttura
     condivisa per database, data warehouse e servizi AI.}
   \label{fig:architettura_suite}
 \end{figure}
@@ -112,8 +109,8 @@ performante e sostenibile di progetti di AI generativa).
 % =====================================================================
 
 Prima di esaminare i singoli agenti, questa sezione descrive gli elementi
-trasversali del progetto, condivisi da tutti i servizi della suite e
-presentati qui una sola volta: lo stack tecnologico, l'organizzazione del
+trasversali del progetto,presentati qui una sola volta: l
+o stack tecnologico, l'organizzazione del
 codice, l'infrastruttura come codice con la pipeline di rilascio, e il
 modello di identità e autorizzazione.
 
@@ -121,13 +118,14 @@ modello di identità e autorizzazione.
 \label{subsec:agenti-stack-tech}
 
 L'implementazione dell'ecosistema di agenti è basata su uno stack cloud-native
-il più possibile omogeneo, scelto per minimizzare la diversità fra servizi (riducendo la complessità
+ omogeneo per minimizzare la diversità fra servizi (riducendo la complessità
 per quanto possibile) e per delegare ai \emph{managed services} di Google Cloud Platform tutti i compiti
 infrastrutturali.
 
 \begin{itemize}
   \item \textbf{Backend.} Tutti gli agenti sono scritti in Python~3.10+ ed
-        esposti tramite il framework asincrono FastAPI~\cite{fastapi_docs}. La scelta è motivata
+        esposti tramite il framework asincrono FastAPI~\cite{fastapi_docs}. 
+        La scelta è motivata
         dalla natura prevalentemente \emph{I/O bound} delle interazioni con i
         Large Language Model: la generazione di una risposta richiede da
         centinaia di millisecondi a decine di secondi, quasi interamente spesi
@@ -170,8 +168,9 @@ infrastrutturali.
 \subsection{Organizzazione del codice}
 \label{subsec:agenti-multirepo}
 
-Il codice sorgente dell'intera suite è organizzato in repository Git distinti,
-ciascuno autonomo e con il proprio ciclo di vita. Ogni repository
+Il codice sorgente dell'intera suite è organizzato in repository Git distinti
+(Fig.~\ref{fig:multirepo_tree}), ciascuno autonomo e con il proprio ciclo di
+vita, e raccolti in un unico progetto Bitbucket (Fig.~\ref{fig:progetto_bitbucket}). Ogni repository
 contiene il proprio \texttt{Dockerfile}, le proprie dipendenze e il proprio
 file di descrizione della pipeline (\texttt{cloudbuild.yaml}),
 ed è collegato a un trigger Cloud Build dedicato. Questa separazione consente
@@ -222,7 +221,7 @@ ausiliari (\texttt{auth.py}, \texttt{tools.py}, \texttt{agent.py}, \texttt{quote
 \subsection{Infrastruttura come codice e pipeline CI/CD}
 \label{subsec:agenti-iac}
 
-L'intera infrastruttura GCP è descritta in Terraform~\cite{terraform_docs} ed è
+L'intera infrastruttura GCP è descritta in Terraform~\cite{terraform_docs} (Fig.~\ref{fig:arch_terraform}) ed è
 parametrizzata su due ambienti, \texttt{test} e \texttt{prod}, gestiti come
 progetti indipendenti con \emph{state} remoto su un bucket Cloud
 Storage. Le risorse provisionate comprendono: l'abilitazione delle API GCP
@@ -271,7 +270,7 @@ revisionata:
   \label{fig:arch_terraform}
 \end{figure}
 
-La pipeline CI/CD si attiva ad ogni \emph{push}: in ambiente di test sul branch
+La pipeline CI/CD (Fig.~\ref{fig:cicd_pipeline}) si attiva ad ogni \emph{push}: in ambiente di test sul branch
 \texttt{test}, in produzione sul branch \texttt{main}. Cloud Build, configurato
 tramite un \emph{trigger} per ciascun servizio collegato al rispettivo
 repository Bitbucket, esegue i passi descritti nel \texttt{cloudbuild.yaml}
@@ -333,6 +332,8 @@ propagati dai sistemi HR a Entra ID, sono utilizzati per personalizzare
 le risposte degli agenti (es. tono, contesto organizzativo) ma non per
 controllare l'accesso.
 
+Le Fig.~\ref{fig:login1} e~\ref{fig:login2} mostrano rispettivamente il punto di accesso al portale, da cui parte il flusso OAuth~2.0 + PKCE, e la schermata di autenticazione Entra ID personalizzata con il brand aziendale.
+
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=0.75\textwidth,height=0.4\textheight,keepaspectratio]{login1}
@@ -371,7 +372,7 @@ AllyCare e SysAid nelle query BigQuery.
 \label{sec:agenti-portal-impl}
 % =====================================================================
 
-Una volta autenticato, l'utente accede al portale, che funge da punto di ingresso
+Una volta autenticato, l'utente accede al portale (Fig.~\ref{fig:portal_menu}), che funge da punto di ingresso
 unico per tutti gli agenti, in coerenza con il principio
 di modularità verticale e accesso centralizzato
 (Sez.~\ref{sec:agenti-principi}).
@@ -461,6 +462,8 @@ che la fonte sia sempre verificabile e cliccabile, e che la sua presenza sia
 imposta dal sistema (non opzionale per il modello), realizza il vincolo di
 verificabilità descritto nella Sez.~\ref{subsec:vera-caso-uso}.
 
+Le Fig.~\ref{fig:vera_conv_web} e~\ref{fig:vera_conv_doc} mostrano due conversazioni reali con Vera, rispettivamente in modalità Web grounding (con fonti citate inline) e dopo il caricamento di un documento.
+
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=0.68\textwidth,height=0.85\textheight,keepaspectratio]{vera1}
@@ -484,7 +487,7 @@ modello in Vera attraversa una catena di controlli predisposta nel servizio
 
 \begin{enumerate}
   \item \textbf{Sanitizzazione del prompt.} Prima dell'invio all'LLM, il testo passa per il template
-        di Google Cloud Model Armor~\cite{gcp_modelarmor}, che combina un classificatore
+        di Google Cloud Model Armor~\cite{gcp_modelarmor} (Sez.~\ref{sec:bg-security}), che combina un classificatore
         \emph{Responsible AI} (\emph{hate}, \emph{harassment}, \emph{sexually explicit},
         \emph{dangerous}), il rilevatore di \emph{prompt injection}~\cite{perez2022promptinjection}
         e la \emph{Sensitive Data Protection}~\cite{gcp_dlp} per le PII, in linea con l'European AI
@@ -660,6 +663,8 @@ con \texttt{Content-Disposition: inline}. Il modello non ha mai
 visibilit\`a degli URL firmati e l'utente non pu\`o aggirare la
 verifica del token visitando un link.
 
+Le Fig.~\ref{fig:coopolicy_conv1} e~\ref{fig:coopolicy_conv2} mostrano una conversazione con CooPolicy e il relativo pannello delle fonti, da cui il PDF originale è raggiungibile attraverso il proxy autenticato appena descritto.
+
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=0.68\textwidth,height=0.85\textheight,keepaspectratio]{coopolicy2}
@@ -808,9 +813,9 @@ classificare commenti per produrre numeri (la categorizzazione
 quantitativa va sempre dalla tabella arricchita). Una regola di
 ``fiducia nel tool'' impone inoltre che, se \texttt{run\_sql} ha
 restituito un dato, sia quel dato a essere riportato, anche se il
-modello ``ricorda'' numeri diversi da turni precedenti. Questo accorgimento
-ha, ad esempio, eliminato in fase di test una classe di errori in cui il modello,
-ricalcolando mentalmente, contraddiceva il proprio tool.
+modello ``ricorda'' numeri diversi da turni precedenti.
+
+Le Fig.~\ref{fig:allycare_conv1}, \ref{fig:allycare_chart} e~\ref{fig:allycare_conv2} mostrano tre interazioni con AllyCare: un'analisi quantitativa dell'NPS, un grafico generato dinamicamente dai dati estratti via SQL e un'analisi qualitativa dei commenti liberi.
 
 \begin{figure}[htbp]
   \centering
@@ -860,7 +865,6 @@ eseguite e usate per la risposta.
 \subsection{Pluralità del modello nel routing}
 \label{subsec:agenti-sysaid-confronto}
 
-SysAid deve implementare in modo più esplicito il principio di indipendenza dal fornitore di LLM.
 Il backend deve essere realizzato come servizio unificato che ospita due code parallele, alimentate da due fornitori concorrenti:
 Gemini 2.5 Flash su Vertex AI~\cite{gcp_vertexai} per le richieste a bassa complessità e
 Claude Sonnet su AnthropicVertex~\cite{anthropic_docs} per le richieste ad alta complessità;
@@ -878,7 +882,8 @@ sulla base ticket SysAid), prompt di sistema, set di tool
 (\texttt{run\_sql}, \texttt{analyze\_text}, \texttt{generate\_chart}),
 conversazioni e interfaccia utente React. Il routing interno avviene
 all'ingresso dell'endpoint \texttt{/api/sysaid/prompt}: il campo
-\texttt{complexity} determina quale code path viene percorso.
+\texttt{complexity} determina quale code path viene percorso. La
+Tab.~\ref{tab:sysaid-confronto} confronta le due code path, evidenziando come la logica di business resti condivisa e le differenze si concentrino sul solo fornitore di LLM.
 
 \begin{table}[htbp]
   \centering
@@ -968,6 +973,8 @@ gli adattamenti rispetto al fornitore restano localizzati alla traduzione
 di schema dei tool, all'ispezione dei \texttt{stop\_reason} e alla
 serializzazione dei content block. Aggiungere un terzo fornitore richiederebbe
 un nuovo adapter, non una riscrittura della logica.
+
+Le Fig.~\ref{fig:sysaid_conv_gemini} e~\ref{fig:sysaid_conv_sonnet} mostrano due conversazioni reali con SysAid, servite rispettivamente dalla code path Gemini~2.5 Flash (bassa complessità) e dalla code path Claude Sonnet~4.6 (alta complessità).
 
 \begin{figure}[htbp]
   \centering

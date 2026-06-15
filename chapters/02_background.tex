@@ -106,7 +106,7 @@ Il \emph{grounding} è l'insieme di tecniche che ancorano la generazione del mod
 mitigando il rischio di allucinazione~\cite{guu2020realm}. Sostanzialmente, il contesto del modello viene arricchito con 
 informazioni recuperate al momento stesso della richiesta, recuperate da fonti che possono essere citate dal modello, verificate, 
 e (tranne nel caso del web grounding) note a priori. 
-Di seguito i dettagli delle tipologie di grounding adottate:
+La Fig.~\ref{fig:grounding_three_ways} affianca le tre forme adottate nella suite; di seguito i dettagli di ciascuna:
 
 \begin{figure}[htbp]
     \centering
@@ -133,7 +133,7 @@ Per questo caso d'uso sono invece indicati RAG e Text-to-SQL.
 
 La Retrieval-Augmented Generation (RAG)~\cite{lewis2020rag} è una tecnica che arricchisce il contesto del modello 
 con frammenti (\emph{chunk}) recuperati da un corpus documentale indicizzato. 
-La pipeline canonica prevede cinque fasi:
+La pipeline canonica prevede cinque fasi (Fig.~\ref{fig:rag_pipeline}):
 
 \begin{enumerate}
   \item \textbf{Ingestione.} I documenti sorgente (PDF, DOCX, HTML) sono suddivisi in chunk di dimensione fissa (tipicamente 256--1024~token) 
@@ -220,7 +220,7 @@ Il ciclo si ripete fino a quando il modello produce una risposta finale.
 
 Le architetture multi-agente estendono il paradigma singolo-agente a sistemi con $N$ agenti 
 che cooperano o competono per risolvere un compito. 
-Un survey recente~\cite{guo2024multiagent} identifica tre macro-categorie:
+Un survey recente~\cite{guo2024multiagent} identifica tre macro-categorie (Fig.~\ref{fig:multiagent_taxonomy}):
 
 \begin{description}
   \item[Cooperative.] Gli agenti collaborano alla soluzione: ogni agente contribuisce con la propria specializzazione. 
@@ -259,10 +259,9 @@ se instradare la richiesta verso un modello ``forte'' (più costoso) o ``debole'
 Gli autori confrontano quattro approcci di routing (Matrix Factorization, BERT classifier, Causal LLM, Similarity-Weighted Ranking) 
 su benchmark standard (MMLU, MT-Bench).
 
-Il router di Orion si posiziona in questo quadro come un \emph{LLM-based router}: 
-la decisione di routing è affidata a un modello di linguaggio (Gemini Flash) con output strutturato, non a un modello appreso. 
-Rispetto a RouteLLM, il vantaggio è la flessibilità (aggiungere un nuovo agente richiede l'aggiornamento del prompt, non il riaddestramento); 
-lo svantaggio è il costo di una chiamata LLM per ogni richiesta, anche se mitigato dalla scelta di un modello veloce ed economico.
+Il router di Orion si posiziona in questo quadro come un \emph{LLM-based router}:
+la decisione di routing è affidata a un modello di linguaggio (Gemini Flash) con output strutturato, non a un modello appreso.
+Il confronto puntuale con RouteLLM e con gli altri sistemi affini, con i relativi trade-off, è sviluppato nel Cap.~\ref{chap:orion} (Sez.~\ref{sec:orion-related}).
 
 % =====================================================================
 \section{Stima dell'incertezza e confidence calibration}
@@ -346,8 +345,7 @@ L'intera suite è ospitata su Google Cloud Platform e fa uso di servizi managed 
   \item[Terraform~\cite{terraform_docs}.] Strumento di Infrastructure-as-Code che descrive l'intera infrastruttura GCP in file dichiarativi (\texttt{.tf}). 
   Ogni risorsa (servizi Cloud Run, trigger Cloud Build, istanza Cloud SQL, bilanciatore di carico, policy IAM, segreti...) è versionata e riproducibile.
 
-  \item[FastAPI~\cite{fastapi_docs}.] Framework Python asincrono scelto per tutti i backend. 
-  La scelta è motivata dalla natura I/O bound delle interazioni con gli LLM: il modello di concorrenza \texttt{async/await} 
-  consente di sostenere centinaia di richieste concorrenti per istanza senza thread multipli.
+  \item[FastAPI~\cite{fastapi_docs}.] Framework Python asincrono utilizzato per tutti i backend. 
+
   
 \end{description}

@@ -16,7 +16,7 @@ in meno di due mesi il servizio ha raggiunto 100~milioni di utenti, e nel giro d
 sono entrati nella routine quotidiana di milioni di professionisti per la generazione di testi, 
 l'analisi di documenti, la scrittura di codice e la risposta a domande più o meno complesse.
 
-L'adozione \emph{enterprise}, tuttavia, ha seguito un percorso diverso, lento e incerto, 
+L'adozione \emph{enterprise}, tuttavia, ha seguito un percorso diverso e più incerto, 
 principalmente a causa di queste criticità:
 
 \paragraph{Costo.} Le licenze SaaS dei principali fornitori di AI generativa sono tariffate per utente. 
@@ -32,7 +32,9 @@ rilevante.
 \paragraph{Affidabilità.} I modelli generativi soffrono del fenomeno dell'\emph{allucinazione}: 
 possono produrre affermazioni plausibili e ben formulate ma fattualmente false o errate~\cite{xu2024hallucination}. 
 In un contesto aziendale, un'informazione errata su una procedura, un dato finanziario 
-o un obbligo contrattuale può avere conseguenze concrete con effetti potenzialmente imprevedibili. 
+o un obbligo contrattuale può avere conseguenze concrete con effetti potenzialmente imprevedibili.
+
+Queste tre criticità delimitano il punto di partenza del percorso argomentativo della tesi, che dal contesto generale dell'adozione enterprise dell'AI generativa procede fino ai contributi specifici qui proposti (Fig.~\ref{fig:imbuto_narrativo}).
 
 \begin{figure}[htbp]
     \centering
@@ -115,7 +117,9 @@ I contributi specifici sono tre:
   Capitolo~\ref{chap:orion-valutazione}.
 \end{enumerate}
 
-L'approccio si colloca nel filone della letteratura sui sistemi 
+I tre contributi appena elencati sono sintetizzati nella Fig.~\ref{fig:contributi_sintesi}.
+
+L'approccio si colloca nel filone della letteratura sui sistemi
 multi-agente basati su LLM~\cite{wu2023autogen,guo2024multiagent} 
 e sul routing LLM~\cite{ong2024routellm}, con la specificità di un'implementazione 
 completa e collocata in un contesto reale.
@@ -145,8 +149,9 @@ completa e collocata in un contesto reale.
   non un classificatore addestrato su dati di preferenza. 
   L'alternativa appresa è discussa come direzione futura.
 
-  \item Questa tesi \textbf{non sostiene che l'architettura proposta sia universalmente la risposta giusta}. 
-  Mostra che lo è \emph{in questo contesto}, alla luce degli specifici vincoli esposti.
+  \item Soprattutto, questa tesi \textbf{non sostiene che l'architettura proposta sia universalmente la risposta giusta}. 
+  Mostra che lo è \emph{in questo contesto}, alla luce degli specifici vincoli esposti e in vigore: le possibilità offerte da questa
+  tecnologia evolvono a velocità notevole e il contesto stesso potrebbe mutare in tempi brevi.
 
 \end{itemize}
 
@@ -170,14 +175,15 @@ alle fondazioni trasversali (stack tecnologico, organizzazione multi-repository,
 infrastruttura Terraform, pipeline CI/CD, identità e catena di sicurezza),
 fino ai dettagli realizzativi dei quattro agenti.
 
-Il \textbf{Capitolo~\ref{chap:orion}} presenta l'orchestratore Orion:
+Il \textbf{Capitolo~\ref{chap:orion}} descrive l'orchestratore Orion:
 motivazione e posizionamento rispetto alla letteratura,
 routing step con output strutturato e logica di confidence e clarification,
 agent proxy, gestione della storia conversazionale,
 frontend con badge trasparente, admin panel,
 infrastruttura e schema del database.
 
-Il \textbf{Capitolo~\ref{chap:orion-valutazione}} presenta la valutazione sperimentale su più piani:
+Il \textbf{Capitolo~\ref{chap:orion-valutazione}} riporta i passi di valutazione sperimentale 
+eseguiti su più piani:
 il routing dell'orchestratore (domande di ricerca, gold standard, metriche dichiarate a priori,
 anatomia del prompt e tecniche di prompt engineering applicate ai dati aziendali, risultati e iterazione del prompt),
 la qualità dei sub-agenti (execution accuracy per gli agenti Text-to-SQL e faithfulness per il RAG),

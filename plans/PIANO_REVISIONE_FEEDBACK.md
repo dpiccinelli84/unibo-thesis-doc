@@ -1,7 +1,8 @@
-# Piano di revisione tesi — recepimento feedback prof (giugno 2026)
+# Piano di revisione tesi — recepimento feedback prof (giugno–luglio 2026)
 
-> Roadmap operativa per la revisione della tesi dopo il primo giro di feedback
-> (mail di Bianca Raimondi e Saverio Giallorenzo del 4/6/2026).
+> Roadmap operativa per la revisione della tesi dopo i feedback dei prof:
+> **primo giro** (mail di Bianca Raimondi e Saverio Giallorenzo del 4/6/2026 → Fasi 0–4)
+> e **secondo giro** (colloquio con Bianca Raimondi del 9/7/2026 → Fase 5).
 > **Aggiornare le checkbox a ogni sessione di lavoro.**
 
 ---
@@ -17,6 +18,22 @@
   architettura → implementazione → Orion ("presentare una sola volta e richiamare");
   fondere i capitoli in 1 o 2. Amministrativo: **Gabbrielli relatore, Giallorenzo e
   Raimondi correlatori**.
+
+**Feedback ricevuto (colloquio Raimondi, 9/7/2026)** — dettaglio operativo in Fase 5:
+- Indice più asciutto: ridurre gli "elenchi puntati" di sezioni, **max 4–5 sottosezioni**
+  (il rilievo parte dal Background, ma vale per tutti i capitoli).
+- "Spremere" la parte sperimentale.
+- **Non dare mai per scontato che un argomento sia conosciuto**: Transformer sicuramente,
+  encoder/decoder, attention mechanism; pretraining/fine-tuning ecc. con figure o esempi
+  testuali (es. pretraining = nessuna label → mostrare sample); zero-shot/few-shot sempre
+  con esempi, idealmente immagini (strumento suggerito: Draw.io; se immagini dal web,
+  citarne la fonte).
+- Citazioni dei paper: se il paper è solo su arXiv va bene arXiv; **se esiste anche la
+  versione in conferenza/rivista, preferire quella**.
+- Aggiungere citazioni in generale.
+- Framework RAGAS: più dettaglio, con le specifiche tecniche usate e **1 esempio semplice
+  ma concreto di valutazione di un sample**.
+- Regola generale trasversale: **più esempi ci sono, meglio è.**
 
 **Decisioni prese (sessione 9/6/2026):**
 - Variante **a 2 capitoli**: la polpa descrittiva diventa "Suite di agenti" + "Orion".
@@ -46,7 +63,8 @@ capp. 3–6 = pp. 21–88 (68 pp), cap. 7 = pp. 89–102 (14 pp), totale ~107 pp
 | F1   | Ristrutturazione 8 → 6 capitoli | ✅ 9/6 (fusioni + deduplicazioni; rilettura suture fatta) |
 | F2   | Espansione capitolo Valutazione (prompt eng. + costo–qualità) | ✅ **14/6 completata**: 5.3 + nuova 5.3.4 (PE sugli agenti) + 5.6 costo–qualità con ρ/S reali e worked example |
 | F3   | Esperimenti e dati (richiedono Davide su GCP) | ⏳ F3.4/F3.6 fatte; F3.1/F3.5 tagliate; **resta solo F3.3 (token medi), opzionale** |
-| F4   | Coerenza finale, compilazione, consegna ai prof | ⏳ **14/6: F4.1/F4.2/F4.3 fatte** (asciugatura inclusa); resta F4.4 (consegna — Davide) |
+| F4   | Coerenza finale, compilazione, consegna ai prof | ✅ **9/7**: F4.4 chiusa — feedback ricevuto a voce da Raimondi (→ Fase 5) |
+| F5   | Recepimento feedback Raimondi 9/7 (indice, background didattico, esempi/figure, bibliografia, RAGAS) | ⏳ da avviare |
 
 **Esito misurato (9/6 sera):** capp. 3–4 = pp. 21–82 (62 pp, dalle 68 della
 versione consegnata); cap. 5 = pp. 83–104 (**22 pp, dalle 14 consegnate**):
@@ -327,12 +345,153 @@ Obiettivo: da 14 a ~25–30 pagine. Struttura target:
       **Deciso (14/6): si resta a 59 per ora.** Ultimo gap (59→55) non dalla prosa ma dal
       ridimensionamento degli screenshot oversize (7 a `height=0.85\textheight`, generano pagine
       semivuote) → ~3–4 pp recuperabili senza perdere testo. *(da valutare con Davide.)*
-- [ ] **F4.4** PDF ai prof + eventuale call con Bianca per i prossimi passi
-      (lei si è offerta; raggiungibile anche su Teams per risposte rapide). **(Davide)**
+- [x] **F4.4** *(chiusa 9/7)* Colloquio con Bianca Raimondi avvenuto: ricevuto il
+      secondo giro di feedback (appunti Davide), recepito nella **Fase 5**.
 
 ---
 
-## 8. Vincoli di scrittura (sempre validi)
+## 8. FASE 5 — Recepimento feedback Raimondi (colloquio 9/7/2026)
+
+Filo conduttore del feedback: la tesi è tecnicamente solida ma deve diventare più
+**didattica e autocontenuta** (lettore non esperto di LLM) e più **navigabile**
+(indice asciutto). Regola trasversale: *più esempi ci sono, meglio è*.
+
+### F5.1 — Indice: max 4–5 sottosezioni, meno elenchi
+
+Stato attuale (dal `.toc`): cap. 1 = 6 sezioni; **cap. 2 = 11 sezioni**;
+**cap. 3 = 10 sezioni (+24 sottosezioni)**; **cap. 4 = 11 sezioni**; cap. 5 = 8 sezioni.
+
+- [ ] **F5.1a** Decidere la leva (le due si combinano):
+      (i) **raggruppare le sezioni** in macro-sezioni (~4–5 per capitolo);
+      (ii) **abbassare `tocdepth` a 1** in `main.tex` (le subsection spariscono
+      dall'indice stampato ma restano nel testo) — quick win, non risolve però gli
+      11 titoli di primo livello dei capp. 2 e 4.
+- [ ] **F5.1b** Bozza di raggruppamento da validare con Davide:
+      - **Cap. 2 (11 → 5):** 2.1 Transformer e LLM (ex 2.1+2.2) · 2.2 Prompt
+        engineering e output strutturato (ex 2.3) · 2.3 Grounding e valutazione
+        RAG (ex 2.4+2.5) · 2.4 Agenti, multi-agente, routing e incertezza
+        (ex 2.6+2.7+2.8) · 2.5 Piattaforma enterprise: sicurezza, identità, cloud
+        (ex 2.9+2.10+2.11). Nota: con le espansioni F5.2–F5.5 le nuove sezioni
+        crescono di sottosezioni: restare comunque ≤5 per sezione.
+      - **Cap. 3 (10 → 4):** 3.1 Principi e architettura d'insieme (ex 3.1+3.2) ·
+        3.2 Fondazioni trasversali, incluso il portale (ex 3.3+3.4) · 3.3 I quattro
+        agenti (ex 3.5–3.8 come subsection) · 3.4 Admin panel e alternative
+        scartate (ex 3.9+3.10).
+      - **Cap. 4 (11 → 5):** 4.1 Motivazione, panoramica, lavori correlati
+        (ex 4.1+4.2+4.3) · 4.2 Routing step (ex 4.4) · 4.3 Proxy, storia, flusso
+        di chat (ex 4.5+4.6+4.7) · 4.4 Frontend e admin panel (ex 4.8+4.9) ·
+        4.5 Infrastruttura e decisioni architetturali (ex 4.10+4.11).
+      - **Cap. 5 (8 → 5):** 5.1 RQ e metodologia (ex 5.1+5.2) · 5.2 Prompt del
+        router e risultati (ex 5.3+5.4) · 5.3 Qualità agenti verticali (ex 5.5) ·
+        5.4 Costo–qualità ed economia (ex 5.6+5.7) · 5.5 Discussione (ex 5.8).
+- [ ] **F5.1c** Attenzione tecnica: i label di sezione esistenti sopravvivono come
+      label doppi (stessa tecnica della Fase 1); `placeins` con opzione `[section]`
+      cambia il posizionamento dei float quando si fondono sezioni → ricontrollare
+      la resa delle figure dopo il raggruppamento.
+- [ ] **F5.1d** Nel testo: ridurre gli elenchi puntati dove non necessari
+      (candidati: principi guida in 3.1 — 7 voci description; stack in 3.3.1;
+      elenchi del background), convertendo in prosa o accorpando le voci minori.
+
+### F5.2 — Background: Transformer, encoder/decoder, attention (niente dato per scontato)
+
+Oggi §2.1 liquida tutto in due paragrafi senza figura.
+
+- [ ] **F5.2a** Espandere §2.1: spiegare a livello intuitivo self-attention
+      (query/key/value, multi-head) e la differenza encoder vs decoder vs
+      decoder-only, con un esempio testuale (es. quale parola "attende" a quale
+      in una frase italiana).
+- [ ] **F5.2b** **Figura architettura Transformer** (Draw.io, `diagrams/`):
+      encoder/decoder a blocchi con attention evidenziata; in alternativa figura
+      ridisegnata da Vaswani et al. con fonte citata in caption.
+
+### F5.3 — Pretraining, fine-tuning, RLHF: figure o esempi testuali
+
+Oggi §2.2 descrive le fasi senza esempi ("pretraining no label → mettere sample").
+
+- [ ] **F5.3a** Un esempio testuale per fase: pretraining = corpus senza label +
+      next-token su una frase campione; instruction tuning = coppia (istruzione,
+      risposta) di esempio; RLHF = coppia di risposte A/B con preferenza umana.
+- [ ] **F5.3b** Eventuale figura unica "pipeline a tre fasi" (pretraining →
+      instruction tuning → RLHF) in Draw.io.
+
+### F5.4 — Zero-shot / few-shot / CoT: sempre esempi, idealmente immagini
+
+- [ ] **F5.4a** In §2.3, per ciascuna tecnica un mini-esempio completo input→output;
+      per few-shot mostrare il prompt con 2 esempi in-context + il nuovo input.
+      Preferire esempi del dominio della tesi (es. classificazione di un ticket),
+      che preparano il lettore al prompt del router (già few-shot in 5.3.2).
+- [ ] **F5.4b** Eventuale figura comparativa zero vs few-shot (Draw.io); se si usa
+      un'immagine dal web, **fonte obbligatoria** in caption e bibliografia.
+
+### F5.5 — RAGAS: specifiche tecniche + 1 esempio concreto di valutazione
+
+Oggi §2.5 è solo un elenco di 4 metriche.
+
+- [ ] **F5.5a** In §2.5, spiegare *come* si calcolano le metriche: faithfulness =
+      decomposizione della risposta in claim + verifica di ciascun claim contro il
+      contesto recuperato (score = frazione supportata); answer relevancy =
+      domande rigenerate dalla risposta e similarità con la domanda originale.
+- [ ] **F5.5b** **Esempio concreto di un sample**: domanda → chunk recuperati →
+      risposta → claim estratti → verdetto per claim → score (es. 2/3 supportati
+      → faithfulness 0,67). Ideale: un caso reale anonimizzato dalla valutazione
+      di CooPolicy (coerente col vincolo "nessun numero inventato").
+- [ ] **F5.5c** In §5 (eval-rag), esplicitare le **specifiche tecniche usate**:
+      judge = Gemini 2.5 Pro, grounding giudicato sugli snippet da 300 caratteri,
+      formule/prompt di giudizio usati dagli script di `evaluation/`, e rimandare
+      all'esempio di F5.5b.
+
+### F5.6 — Bibliografia: preferire la versione pubblicata ad arXiv
+
+- [ ] **F5.6a** Passata su `bibliography.bib`: per ogni voce oggi "arXiv preprint",
+      cercare la versione in conferenza/rivista e, se esiste, aggiornare venue e
+      URL/DOI. Candidati individuati (da verificare uno a uno):
+      `chang2023llmsurvey` → ACM TIST 2024; `wang2022selfconsistency` → ICLR 2023;
+      `es2023ragas` → EACL 2024 (demo); `liu2023agentbench` → ICLR 2024;
+      `pourreza2023dinsql` → NeurIPS 2023; `wu2023autogen` → COLM 2024;
+      `guo2024multiagent` → IJCAI 2024 (survey); `wang2024moa` → ICLR 2025;
+      `ong2024routellm` → ICLR 2025; `diao2023activeprompting` → ACL 2024;
+      `perez2022promptinjection` → NeurIPS 2022 ML Safety Workshop.
+- [ ] **F5.6b** Voci per cui arXiv basta ("se è solo su arXiv, basta quella"):
+      `xu2024hallucination`, `kadavath2022knowsknows`, `willard2023outlines`,
+      `jiang2024mixtral`, `chen2023frugalgpt`, `sahoo2024prompteng_survey`,
+      `team2024gemini` — verificare che non siano nel frattempo apparse in venue.
+- [ ] **F5.6c** Voci già `@inproceedings` con venue corretta (vaswani, brown,
+      ouyang, wei, yao, lewis, guu, zheng, yu2018spider, li2023bird): dove
+      possibile sostituire l'URL arXiv con il link/DOI dei proceedings
+      ("meglio trovare la versione lì collegata").
+
+### F5.7 — Aggiungere citazioni (punti scoperti censiti)
+
+- [ ] **F5.7a** §2.1: n-grammi / RNN / LSTM oggi senza riferimenti (candidati:
+      Bengio et al. 2003 per i neural LM; Hochreiter & Schmidhuber 1997 per LSTM);
+      LLaMA nominato senza cite (Touvron et al. 2023).
+- [ ] **F5.7b** §2.4.2: hybrid search/BM25, query expansion e HyDE oggi senza
+      riferimenti (candidati: Robertson & Zaragoza 2009 per BM25; Gao et al.,
+      ACL 2023 per HyDE).
+- [ ] **F5.7c** Le nuove parti didattiche F5.2–F5.5 portano citazioni proprie;
+      passata finale per altri concetti citati "a memoria" nel testo.
+
+### F5.8 — "Spremere" la parte sperimentale
+
+Appunto sintetico del colloquio; lettura più coerente con il feedback di giugno
+(la valutazione è il capitolo scientificamente più importante): **estrarre ancora
+più valore dal materiale sperimentale esistente**, in linea con "più esempi è meglio".
+
+- [ ] **F5.8a** Mostrare 1–2 sample end-to-end della valutazione del routing:
+      test case reale → output strutturato del router (agent/complexity/confidence/
+      reasoning) → verdetto (dati già nei CSV `results/` e in `orion_eval_results`).
+- [ ] **F5.8b** Mostrare 1 sample Text-to-SQL: domanda → query generata vs query
+      gold → confronto result-set (dai gold standard di `evaluation/`).
+- [ ] **F5.8c** L'esempio RAGAS di F5.5b copre il piano RAG.
+- [ ] **F5.8d** Rivalutare le opzionali rimaste in questa chiave: F2.3a/F3.2
+      (gold esteso ambigui), F2.3b (varianza intra-run), F3.3 (token medi reali).
+- [ ] **F5.8e** Se al prossimo contatto emerge che "spremere" significava invece
+      *comprimere*, ripiegare su: asciugare 5.2 (metodologia) e ridimensionare gli
+      screenshot dell'admin panel — da chiarire con Raimondi (Teams).
+
+---
+
+## 9. Vincoli di scrittura (sempre validi)
 
 1. **Nessun numero inventato**: ogni dato nuovo in tesi deve provenire da una run reale
    o da una fonte verificabile. Dove il dato manca → commento `% TODO F3.x` nel .tex.
@@ -341,3 +500,7 @@ Obiettivo: da 14 a ~25–30 pagine. Struttura target:
    citazioni biblatex `\cite{}`).
 4. Il PDF deve restare compilabile e presentabile a ogni fine sessione: le sezioni
    non ancora scritte vivono come scalette in commento LaTeX, non come pagine vuote.
+5. **(9/7)** Figure: preferire diagrammi propri (Draw.io, sorgenti in `diagrams/`);
+   immagini prese dal web solo con fonte citata in caption e in bibliografia.
+6. **(9/7)** Ogni concetto tecnico introdotto nel background deve avere almeno un
+   esempio concreto o una figura: non dare mai per scontato che il lettore lo conosca.
